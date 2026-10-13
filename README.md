@@ -27,15 +27,15 @@ The current implementation establishes the client-side onboarding and authorizat
                   │                 GateWay Core                 │
                   ├──────────────────────────────────────────────┤
                   │                                              │
-                  │   [1] Role & Domain Auth (LoginModal.jsx)   │
+                  │   [1] Role & Domain Auth (LoginModal.jsx)    │
                   │       ├── @iitrpr.ac.in / @campus.edu        │
                   │       └── Persona Switch (Student / Faculty) │
                   │                                              │
                   │   [2] Pass Request Desk (ResidentPortal.jsx) │
                   │       ├── Visitor KYC (Aadhaar / Passport)   │
                   │       ├── Host Endorsement Document          │
-                  │       ├── Window & Duration Calculation     │
-                  │       └── Dynamic Pass Ticket (Locked QR)   │
+                  │       ├── Window & Duration Calculation      │
+                  │       └── Dynamic Pass Ticket (Locked QR)    │
                   │                                              │
                   └──────────────────────────────────────────────┘
 ```
