@@ -1,141 +1,172 @@
 # GateWay
 
-> **Intelligent Campus Access & Verification Platform**  
-> A unified, role-governed client portal engineered to streamline institutional visitor pre-clearance, mandate dual-proof verification, and phase out paper visitor logs.
+> **Smart Campus Access & Authentication System**  
+> An enterprise-grade, role-based digital verification and access management platform engineered to automate visitor sponsorships, enforce institutional identity policies, and provide real-time optical QR authentication at physical campus checkpoints.
 
 ---
 
-##  Executive Summary
+##  Executive Overview
 
-Modern campus gates face common bottlenecks: physical ledger registers, lack of advance host accountability, and manual credentials checking. **GateWay** provides a zero-friction, browser-first access workflow connecting campus residents directly to digital security verification.
+Manual gate registers in large university campuses and residential institutions frequently lead to security vulnerabilities, manual record tamperings, long perimeter queues, and an absence of host accountability. 
 
-The current implementation establishes the client-side onboarding and authorization foundation across two primary core modules:
-1. **Institutional Authentication Gate (`LoginModal.jsx`)**
-2. **Resident Pre-Clearance Console (`ResidentPortal.jsx`)**
+**GateWay** establishes an end-to-end cryptographic and optical verification workflow connecting three vital operational stakeholders:
+1. **Campus Residents (Host Sponsors):** Students and faculty who initiate pre-approved visitor clearance accompanied by digital identity proofs.
+2. **Security Desk Officers:** Administrative supervisors who inspect KYC records, evaluate visitor clearance, and enforce perimeter blacklist policies.
+3. **Gate Terminal Guards:** Checkpoint personnel armed with hardware-level optical QR recognition to execute instant check-in and check-out logs.
 
 ---
 
-##  Architecture & Component Topology
+##  Key Highlights & Capabilities
+
+-  **Zero-Trust Institutional Access:** Email domain white-listing ensures strictly verified university personnel can request gate entry.
+-  **Dual-Party KYC Verification:** Pairs government identification (Aadhaar/Passport) with resident verification credentials before pass issuance.
+-  **Live Hardware Optical Scanning:** Native camera-based frame parser powered by `html5-qrcode` to decode visitor QR tokens without auxiliary hardware.
+-  **Temporal Stay Boundary Enforcement:** Real-time date interval calculators prevent pass reuse and detect overstay breaches automatically.
+-  **Interactive KYC Document Console:** Built-in viewer with multi-level scaling, canvas panning, and $90^\circ$ continuous image rotation for border security checks.
+-  **Real-Time Operational Audit:** Immediate export of perimeter event logs to RFC-compliant CSV files.
+
+---
+
+##  System Architecture & Event Pipeline
 
 ```
-                  ┌──────────────────────────────────────────────┐
-                  │          Institutional User / Host           │
-                  └──────────────────────┬───────────────────────┘
-                                         │
-                                         ▼
-                  ┌──────────────────────────────────────────────┐
-                  │                 GateWay Core                 │
-                  ├──────────────────────────────────────────────┤
-                  │                                              │
-                  │   [1] Role & Domain Auth (LoginModal.jsx)    │
-                  │       ├── @iitrpr.ac.in / @campus.edu        │
-                  │       └── Persona Switch (Student / Faculty) │
-                  │                                              │
-                  │   [2] Pass Request Desk (ResidentPortal.jsx) │
-                  │       ├── Visitor KYC (Aadhaar / Passport)   │
-                  │       ├── Host Endorsement Document          │
-                  │       ├── Window & Duration Calculation      │
-                  │       └── Dynamic Pass Ticket (Locked QR)    │
-                  │                                              │
-                  └──────────────────────────────────────────────┘
+                               ┌────────────────────────────────────────────────────────┐
+                               │                    GATEWAY PLATFORM                    │
+                               │        [ Institutional Email & Role Dispatcher ]       │
+                               └───────────────────────────┬────────────────────────────┘
+                                                           │
+                                                           ▼
+                                      ┌─────────────────────────────────────────┐
+                                      │             LoginModal.jsx              │
+                                      │    (@iitrpr.ac.in / Institutional SSO)  │
+                                      └────────────────────┬────────────────────┘
+                                                           │
+                     ┌─────────────────────────────────────┼─────────────────────────────────────┐
+                     │                                     │                                     │
+                     ▼                                     ▼                                     ▼
+      ┌─────────────────────────────┐       ┌─────────────────────────────┐       ┌─────────────────────────────┐
+      │       RESIDENT PORTAL       │       │      ADMIN SECURITY DESK    │       │     GUARD CHECKPOINT POST   │
+      │    (ResidentPortal.jsx)     │       │       (AdminDesk.jsx)       │       │    (GuardTerminal.jsx)      │
+      ├─────────────────────────────┤       ├─────────────────────────────┤       ├─────────────────────────────┤
+      │ • Visitor Details & Purpose │       │ • Pre-Clearance Queue       │       │ • Optical Hardware Scanner  │
+      │ • Aadhaar / Passport Validation     │ • Demographic Metrics       │       │ • Passcode Search Engine    │
+      │ • Host Residence Proof      │       │ • Blacklist Security Toggle │       │ • Automated Overstay Alert  │
+      │ • Dynamic Pass Preview      │       │ • Document Inspector Trigger│       │ • Gate Check-IN / Check-OUT │
+      └──────────────┬──────────────┘       └──────────────┬──────────────┘       └──────────────┬──────────────┘
+                     │                                     │                                     │
+                     └─────────────────────────────────────┼─────────────────────────────────────┘
+                                                           │
+                                                           ▼
+                                      ┌─────────────────────────────────────────┐
+                                      │             SECURITY MODALS             │
+                                      │              (Modals.jsx)               │
+                                      ├─────────────────────────────────────────┤
+                                      │ • LargeDocModal: Zoom & Inspection Tool │
+                                      │ • QrGeneratedModal: Vector Token Pass   │
+                                      └─────────────────────────────────────────┘
 ```
 
 ---
 
-##  Implemented Feature Breakdown
+##  Component Architecture & Responsibilities
 
-### 1. Institutional Authentication Engine (`LoginModal.jsx`)
+### 1. `LoginModal.jsx` — Institutional Identity Gate
+- **Domain Whitelisting:** Enforces strict domain ending rules (`@iitrpr.ac.in`, `@campus.edu`), eliminating unauthenticated guest entries.
+- **Contextual Role Routing:** Seamlessly branches access between **Resident**, **Security Admin**, and **Gate Guard** personas.
+- **Roll Number Binding:** Dynamically reveals and binds academic student roll/entry credentials when in student mode.
 
-The front-facing gatekeeper ensuring system access is strictly restricted to valid institutional members.
+### 2. `ResidentPortal.jsx` — Visitor Sponsorship Console
+- **KYC Formatting Rules:** Validates 12-digit numeric Aadhaar cards and international alphanumeric Passport formats.
+- **Binary Proof Attachments:** Handles local blob generation for `.jpg`, `.jpeg`, and `.pdf` verification documents.
+- **Dynamic Stay Evaluation:** Automatically computes length-of-stay parameters (`exitDate - arrivalDate + 1`) and restricts date inversions.
+- **Live Pass Ticket:** Delivers an instant visual representation of the clearance pass with real-time state badges.
 
-* **Domain Whitelisting:** Enforces client-side validation against designated academic top-level domains (`@iitrpr.ac.in`, `@campus.edu`).
-* **Persona Partitioning:**
-  * **Resident Category:** Sub-categorizes users into **Student** or **Faculty**.
-  * **Student ID Ingestion:** Demands valid academic Roll / Entry Number when student context is active.
-* **Controlled Access Handover:** Yields sanitized session states (`activeUser`) with validation flags consumed by downstream UI containers.
-* **Non-Obtrusive Backdrop:** Integrates glassmorphism (`backdrop-blur-md`) to keep campus background context visible during authentication.
+### 3. `AdminDesk.jsx` — Security Clearance & Control
+- **Authorization Queue:** Centralizes pending visitor applications requiring officer review.
+- **Perimeter Blacklist Engine:** Enables one-click blacklisting/flagging of suspicious entities to block campus entry.
+- **Live Demographic Meters:** Real-time progress bars analyzing Purpose ratios (Academic vs. Personal) and Premises distribution (Faculty vs. Hostels).
+- **Inspection Dispatch:** Mounts high-resolution verification modal components for credential proof auditing.
 
----
+### 4. `GuardTerminal.jsx` — Physical Checkpoint Station
+- **Hardware Optical Scanning:** Mounts a high-frame camera stream via `html5-qrcode` to decode visitor QR matrices directly.
+- **Multi-Vector Directory Search:** Enables rapid filtering across 4-digit passcodes, visitor names, host apartments, and email addresses.
+- **Overstay Sentinel:** Detects visitors who exceed allowed visit durations while remaining inside the premises.
+- **CSV Data Log:** Instant local export of time-stamped perimeter log data for security archives.
 
-### 2. Resident Pre-Clearance Console (`ResidentPortal.jsx`)
-
-The operational center where campus members sponsor guests, upload verification artifacts, and inspect passes.
-
-#### A. Guest Intake & Verification Rules
-* **Identification Enforcement:** Accepts Aadhaar Card (strictly formatted to 12 digits) or Passport (1 alphabet + 7 digits).
-* **Document Upload Pipeline:** Restricts digital ID attachments strictly to `.jpg`, `.jpeg`, and `.pdf` files, dynamically generating object URLs for preview inspection.
-
-#### B. Resident Host Sponsorship
-* **Identity Synchronization:** Automatically prepends host titles (`Prof.` or `Student`) and assigns premises locations (Faculty Residential Enclave or Campus Student Hostel) based on authenticated session data.
-* **Host Accountability:** Mandates upload of Host Institutional Proof (Student College ID, Faculty Official ID, or Staff Employee Card) alongside the visitor’s credentials.
-
-#### C. Temporal Visit Window & Math
-* **Date Range Computation:** Dynamically computes total stay window duration in calendar days (`exitDate - arrivalDate + 1`).
-* **Chronological Safeguards:** Rejects past departure dates or negative time spans before pass issuance.
-
-#### D. Live Digital Pass Generation
-* **4-Digit Cryptographic Code:** Generates a randomized numeric passcode alongside a high-error-correction (`Level H`) SVG QR matrix.
-* **Conditional Lock State:** Displays passes in a "Pending Approval / QR Locked" state until security review occurs.
-* **Operational Actions:** Equipped with simulated notification dispatches and client-side browser print formatting (`window.print()`).
+### 5. `Modals.jsx` — High-Resolution Inspection & Token Engines
+- **`LargeDocModal`:** Equips officers with Zoom In/Out, Canvas Reset, and continuous $90^\circ$ rotation to scrutinize uploaded proofs.
+- **`QrGeneratedModal`:** Emits SVG-based QR code matrices with Level-H error correction for rapid scanning under varying lighting conditions.
 
 ---
 
-##  Technology Profile
+##  Tech Stack & Dependencies
 
-| Dimension | Tooling | Purpose |
-| :--- | :--- | :--- |
-| **Runtime / Library** | React 18 | Declarative state management & modular component architecture |
-| **Build Pipeline** | Vite 5 | Fast compilation, Hot Module Replacement (HMR), and optimized bundle production |
-| **Utility Styling** | Tailwind CSS 3 | Atomic, responsive layout design & status palettes |
-| **Visual Language** | Lucide React | Contextual icons across auth forms, document uploads, and ticket cards |
-| **Matrix Generation** | `qrcode.react` | Scalable Vector Graphic (SVG) QR rendering with high error resilience |
+| Layer | Technology | Version | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Runtime & Core** | React | `^18.x` | Component-based state architecture & unidirectional data flow |
+| **Build Toolchain** | Vite | `^5.x` | High-speed Hot Module Replacement (HMR) and production bundling |
+| **CSS Architecture** | Tailwind CSS | `^3.x` | Responsive layout utility system with custom design tokens |
+| **Iconography** | Lucide React | Latest | Crisp, accessible interface iconography |
+| **Camera Scanner** | HTML5-QRCode | `^2.3.8`| Client-side camera feed handling & optical matrix decoding |
+| **Matrix Generator** | QRCode.React | `^4.x` | Error-tolerant SVG QR vector rendering |
 
 ---
 
-##  Repository Directory Structure
+##  Source Code Structure
 
-```text
+```
 GateWay/
-├── public/                 # Static web assets & icons
+├── public/                     # Static icons & manifest files
 ├── src/
-│   ├── assets/             # Brand graphics & styles
+│   ├── assets/                 # Vector icons & imagery
 │   ├── components/
-│   │   ├── LoginModal.jsx      # Institutional domain & role auth
-│   │   └── ResidentPortal.jsx  # Visitor clearance & pass rendering
-│   ├── App.jsx             # Root layout & active module orchestrator
-│   ├── main.jsx            # Application mount point
-│   └── index.css           # Global Tailwind directives
-├── index.html              # HTML5 application shell
-├── package.json            # Node project configuration & dependencies
-├── tailwind.config.js      # Utility theme extensions
-└── vite.config.js          # Vite configuration
+│   │   ├── LoginModal.jsx      # Role-based identity & domain validation
+│   │   ├── ResidentPortal.jsx  # Visitor pre-registration & pass creation
+│   │   ├── AdminDesk.jsx       # Security officer approval & analytics
+│   │   ├── GuardTerminal.jsx   # Hardware QR scanning & checkpoint logs
+│   │   └── Modals.jsx          # Interactive doc viewer & QR token modal
+│   ├── App.jsx                 # Global state controller & mock data pipeline
+│   ├── main.jsx                # React root mount point
+│   └── index.css               # Global Tailwind CSS directives
+├── index.html                  # HTML entry point
+├── package.json                # Project dependencies and script declarations
+├── tailwind.config.js          # Tailwind styling rules and breakpoints
+└── vite.config.js              # Vite configuration
 ```
 
 ---
 
-##  Quick Start
+##  Local Development Setup
 
-### 1. Clone the repository
+### 1. Prerequisites
+- **Node.js**: `v18.0.0` or higher
+- **npm**: `v9.0.0` or higher
+
+### 2. Installation
+Clone the repository and install the project dependencies:
 ```bash
 git clone https://github.com/anweshaaroy/GateWay.git
 cd GateWay
-```
-
-### 2. Install dependencies
-```bash
 npm install
 ```
 
-### 3. Run development server
+### 3. Launch Development Server
 ```bash
 npm run dev
 ```
-
-Navigate to `http://localhost:5173` in your browser to interact with the portal.
+Open your browser and navigate to `http://localhost:5173`.
 
 ---
 
-##  Author & Repository
+##  Security & Privacy Standards
 
-- **Author:** Anwesha Roy ([@anweshaaroy](https://github.com/anweshaaroy))
-- **Project Repository:** [GateWay](https://github.com/anweshaaroy/GateWay)
+- **ID Redaction:** Sensitive national identification numbers (such as Aadhaar) are masked upon pass persistence.
+- **Strict Client-Side Validation:** Form inputs are sanitized and restricted to certified MIME types (`.jpg`, `.jpeg`, `.pdf`) before processing.
+- **Local Cryptographic Passcodes:** 4-digit unique token codes are generated randomly with zero third-party tracking scripts.
+
+---
+
+##  Contributors
+
+- **Anwesha Roy** ([@anweshaaroy](https://github.com/anweshaaroy)) — *Project Architecture, Authentication System & Resident Portal*
+- **Kirti Kumari** ([@kirtikumari2004](https://github.com/kirtikumari2004)) — *Guard Checkpoint Terminal & Verification Modals*
