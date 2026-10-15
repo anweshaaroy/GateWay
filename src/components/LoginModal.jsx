@@ -13,6 +13,7 @@ export default function LoginModal({ isOpen, onLogin }) {
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
+    z
     e.preventDefault();
     setErrorMsg("");
 
