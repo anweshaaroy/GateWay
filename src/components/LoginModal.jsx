@@ -1,47 +1,56 @@
 import React, { useState } from "react";
-import { ShieldCheck, Mail, IdCard, ChevronDown, LogIn } from "lucide-react";
+import { GoogleLogin } from "@react-oauth/google";
+import { jwtDecode } from "jwt-decode";
+import { ShieldCheck, ChevronDown, IdCard } from "lucide-react";
 
 export default function LoginModal({ isOpen, onLogin }) {
   const [roleSelect, setRoleSelect] = useState("resident");
   const [residentType, setResidentType] = useState("student"); // "student" | "faculty" | "official"
-  const [email, setEmail] = useState("");
   const [entryNumber, setEntryNumber] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const ALLOWED_DOMAINS = ["@iitrpr.ac.in", "@campus.edu"];
+  // Shudhu IIT Ropar er domain allow kora holo
+  const ALLOWED_DOMAINS = ["@iitrpr.ac.in"];
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setErrorMsg("");
+  // Google SSO Response Handler
+  const handleGoogleSuccess = (credentialResponse) => {
+    try {
+      const decoded = jwtDecode(credentialResponse.credential);
+      const userEmail = decoded.email?.toLowerCase() || "";
 
-    const cleanEmail = email.trim().toLowerCase();
-    const isDomainValid = ALLOWED_DOMAINS.some((domain) => cleanEmail.endsWith(domain));
+      // 1. Strict Domain Whitelisting (Only @iitrpr.ac.in)
+      const isDomainValid = ALLOWED_DOMAINS.some((domain) => userEmail.endsWith(domain));
 
-    // Institutional Domain Validation
-    if (!isDomainValid) {
-      setErrorMsg(
-        `Access Denied: Only institutional IDs ending with ${ALLOWED_DOMAINS.join(" or ")} are authorized.`
-      );
-      return;
+      if (!isDomainValid) {
+        setErrorMsg(
+          `Access Denied: (${userEmail}) is not authorized. Only official institute accounts (@iitrpr.ac.in) are permitted.`
+        );
+        return;
+      }
+
+      // 2. Student Roll Number Requirement
+      if (roleSelect === "resident" && residentType === "student" && !entryNumber.trim()) {
+        setErrorMsg("Please enter your Student Entry / Roll Number before signing in.");
+        return;
+      }
+
+      // 3. Dispatch to Global App State
+      const finalRole = roleSelect === "resident" ? residentType : roleSelect;
+      onLogin({
+        name: decoded.name,
+        role: finalRole,
+        mainRole: roleSelect,
+        email: userEmail,
+        entryNumber: finalRole === "student" ? entryNumber.trim().toUpperCase() : null,
+        picture: decoded.picture,
+        isVerified: true,
+      });
+    } catch (err) {
+      console.error("Token decoding error:", err);
+      setErrorMsg("Failed to authenticate account. Please try again.");
     }
-
-    // Student Roll Number Requirement (Only checks if provided, no pattern restriction)
-    if (roleSelect === "resident" && residentType === "student" && !entryNumber.trim()) {
-      setErrorMsg("Please enter your Student Entry / Roll Number.");
-      return;
-    }
-
-    // Direct Login Authentication
-    const finalRole = roleSelect === "resident" ? residentType : roleSelect;
-    onLogin({
-      role: finalRole,
-      mainRole: roleSelect,
-      email: cleanEmail,
-      entryNumber: finalRole === "student" ? entryNumber.trim().toUpperCase() : null,
-      isVerified: true,
-    });
   };
 
   return (
@@ -55,7 +64,7 @@ export default function LoginModal({ isOpen, onLogin }) {
           <div>
             <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">GateWay Portal</h2>
             <p className="text-xs text-slate-500 font-medium">
-              Sign in to access your designated campus dashboard
+              IIT Ropar Institutional Access
             </p>
           </div>
         </div>
@@ -67,7 +76,7 @@ export default function LoginModal({ isOpen, onLogin }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           {/* Select Login Portal */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -97,67 +106,28 @@ export default function LoginModal({ isOpen, onLogin }) {
                 Resident Category *
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {/* 1. Student */}
-                <label className="flex items-center space-x-2 border border-slate-200 rounded-xl p-2.5 cursor-pointer hover:bg-slate-50 transition">
-                  <input
-                    type="radio"
-                    name="resType"
-                    value="student"
-                    checked={residentType === "student"}
-                    onChange={() => setResidentType("student")}
-                    className="text-[#0284c7] focus:ring-[#0284c7]"
-                  />
-                  <span className="text-xs font-bold text-slate-700">Student</span>
-                </label>
-
-                {/* 2. Faculty */}
-                <label className="flex items-center space-x-2 border border-slate-200 rounded-xl p-2.5 cursor-pointer hover:bg-slate-50 transition">
-                  <input
-                    type="radio"
-                    name="resType"
-                    value="faculty"
-                    checked={residentType === "faculty"}
-                    onChange={() => setResidentType("faculty")}
-                    className="text-[#0284c7] focus:ring-[#0284c7]"
-                  />
-                  <span className="text-xs font-bold text-slate-700">Faculty</span>
-                </label>
-
-                {/* 3. Official / Staff */}
-                <label className="flex items-center space-x-2 border border-slate-200 rounded-xl p-2.5 cursor-pointer hover:bg-slate-50 transition">
-                  <input
-                    type="radio"
-                    name="resType"
-                    value="official"
-                    checked={residentType === "official"}
-                    onChange={() => setResidentType("official")}
-                    className="text-[#0284c7] focus:ring-[#0284c7]"
-                  />
-                  <span className="text-xs font-bold text-slate-700">Official</span>
-                </label>
+                {["student", "faculty", "official"].map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setResidentType(type);
+                      setErrorMsg("");
+                    }}
+                    className={`py-2 px-3 text-xs font-bold rounded-xl border capitalize transition ${
+                      residentType === type
+                        ? "border-[#0284c7] bg-sky-50 text-[#0284c7]"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Institutional Email Address */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Institutional Email Address *
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="e.g. user@iitrpr.ac.in"
-                className="w-full text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-[#0284c7] outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Student Roll Number (Only visible for students) */}
+          {/* Student Roll Number */}
           {roleSelect === "resident" && residentType === "student" && (
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -175,20 +145,29 @@ export default function LoginModal({ isOpen, onLogin }) {
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-1">
-                Enter your roll / entry number as registered on your ID card.
+                Enter your roll number before signing in with Google.
               </p>
             </div>
           )}
 
-          {/* Direct Authentication Submit Button */}
-          <button
-            type="submit"
-            className="w-full mt-3 bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold py-3 px-4 rounded-xl text-sm transition shadow-md shadow-sky-600/20 flex items-center justify-center space-x-2 cursor-pointer"
-          >
-            <LogIn className="w-4 h-4" />
-            <span>Authenticate & Enter Portal</span>
-          </button>
-        </form>
+          {/* Google SSO Login Button */}
+          <div className="pt-3 flex flex-col items-center">
+            <div className="w-full flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setErrorMsg("Google Sign-In failed or was cancelled.")}
+                shape="pill"
+                text="signin_with"
+                theme="outline"
+                size="large"
+                width="100%"
+              />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-3 text-center">
+              Requires an active <strong>@iitrpr.ac.in</strong> account.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
