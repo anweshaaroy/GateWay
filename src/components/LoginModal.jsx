@@ -3,7 +3,7 @@ import { ShieldCheck, Mail, IdCard, ChevronDown, LogIn } from "lucide-react";
 
 export default function LoginModal({ isOpen, onLogin }) {
   const [roleSelect, setRoleSelect] = useState("resident");
-  const [residentType, setResidentType] = useState("student");
+  const [residentType, setResidentType] = useState("student"); // "student" | "faculty" | "official"
   const [email, setEmail] = useState("");
   const [entryNumber, setEntryNumber] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -13,7 +13,6 @@ export default function LoginModal({ isOpen, onLogin }) {
   if (!isOpen) return null;
 
   const handleSubmit = (e) => {
-    z
     e.preventDefault();
     setErrorMsg("");
 
@@ -83,7 +82,7 @@ export default function LoginModal({ isOpen, onLogin }) {
                 }}
                 className="w-full text-sm font-semibold px-4 py-3 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-[#0284c7] appearance-none shadow-sm cursor-pointer outline-none text-slate-800"
               >
-                <option value="resident">Resident: Student / Faculty</option>
+                <option value="resident">Resident: Student / Faculty / Official</option>
                 <option value="admin">Security Admin Desk</option>
                 <option value="guard">Guard Terminal Post</option>
               </select>
@@ -91,14 +90,15 @@ export default function LoginModal({ isOpen, onLogin }) {
             </div>
           </div>
 
-          {/* Resident Sub-Category (Student / Faculty) */}
+          {/* Resident Sub-Category (Student / Faculty / Official) */}
           {roleSelect === "resident" && (
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Resident Category *
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex items-center space-x-2 border border-slate-200 rounded-xl p-2.5 cursor-pointer hover:bg-slate-50">
+              <div className="grid grid-cols-3 gap-2">
+                {/* 1. Student */}
+                <label className="flex items-center space-x-2 border border-slate-200 rounded-xl p-2.5 cursor-pointer hover:bg-slate-50 transition">
                   <input
                     type="radio"
                     name="resType"
@@ -109,7 +109,9 @@ export default function LoginModal({ isOpen, onLogin }) {
                   />
                   <span className="text-xs font-bold text-slate-700">Student</span>
                 </label>
-                <label className="flex items-center space-x-2 border border-slate-200 rounded-xl p-2.5 cursor-pointer hover:bg-slate-50">
+
+                {/* 2. Faculty */}
+                <label className="flex items-center space-x-2 border border-slate-200 rounded-xl p-2.5 cursor-pointer hover:bg-slate-50 transition">
                   <input
                     type="radio"
                     name="resType"
@@ -119,6 +121,19 @@ export default function LoginModal({ isOpen, onLogin }) {
                     className="text-[#0284c7] focus:ring-[#0284c7]"
                   />
                   <span className="text-xs font-bold text-slate-700">Faculty</span>
+                </label>
+
+                {/* 3. Official / Staff */}
+                <label className="flex items-center space-x-2 border border-slate-200 rounded-xl p-2.5 cursor-pointer hover:bg-slate-50 transition">
+                  <input
+                    type="radio"
+                    name="resType"
+                    value="official"
+                    checked={residentType === "official"}
+                    onChange={() => setResidentType("official")}
+                    className="text-[#0284c7] focus:ring-[#0284c7]"
+                  />
+                  <span className="text-xs font-bold text-slate-700">Official</span>
                 </label>
               </div>
             </div>
@@ -142,7 +157,7 @@ export default function LoginModal({ isOpen, onLogin }) {
             </div>
           </div>
 
-          {/* Student Roll Number (Any format allowed) */}
+          {/* Student Roll Number (Only visible for students) */}
           {roleSelect === "resident" && residentType === "student" && (
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
