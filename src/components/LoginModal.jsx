@@ -67,7 +67,8 @@ export default function LoginModal({ isOpen, onLogin }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
+    /* Full Black Background */
+    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center p-4">
       {/* Clean White Card */}
       <div className="bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full p-8 md:p-9 relative">
         
