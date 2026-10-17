@@ -11,6 +11,14 @@ import {
   Clock,
   X,
   ShieldAlert,
+  UserPlus,
+  Calendar,
+  IdCard,
+  Building,
+  Phone,
+  CheckCircle,
+  QrCode,
+  Printer,
 } from "lucide-react";
 
 // Real Hardware Optical QR Scanner Modal
@@ -51,7 +59,7 @@ function CameraScannerModal({ isOpen, onClose, onScanSuccess }) {
       } catch (err) {
         console.error("Camera launch error:", err);
         setErrorMsg(
-          "Camera access denied or device not found. Please click the lock/tune icon near your browser address bar, set Camera to 'Allow', and refresh."
+          "Camera access denied or device not found. Please click the lock icon near address bar and allow camera access."
         );
       }
     }, 300);
@@ -106,11 +114,332 @@ function CameraScannerModal({ isOpen, onClose, onScanSuccess }) {
   );
 }
 
-export default function GuardTerminal({ visitors, onStatusChange }) {
+// Instant Spot Walk-In Registration & QR Modal
+function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
+  const [visitorName, setVisitorName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [hostName, setHostName] = useState("");
+  const [purpose, setPurpose] = useState("Personal / Guest");
+  const [fromDate, setFromDate] = useState(new Date().toISOString().slice(0, 10));
+  const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
+  const [idType, setIdType] = useState("Aadhaar Card");
+  const [idDocName, setIdDocName] = useState("");
+  const [idDocUrl, setIdDocUrl] = useState("");
+  const [generatedPass, setGeneratedPass] = useState(null);
+
+  if (!isOpen) return null;
+
+  // Calculate Duration in Days
+  const start = new Date(fromDate);
+  const end = new Date(toDate);
+  const diffTime = Math.max(0, end - start);
+  const calculatedDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setIdDocName(file.name);
+      const url = URL.createObjectURL(file);
+      setIdDocUrl(url);
+    }
+  };
+
+  const handleCreatePass = (e) => {
+    e.preventDefault();
+    if (!visitorName.trim() || !phone.trim() || !hostName.trim()) {
+      alert("Please fill in Visitor Name, Phone Number, and Host details.");
+      return;
+    }
+
+    const randomDigits = Math.floor(1000 + Math.random() * 9000);
+    const newPasscode = `PASS-${randomDigits}`;
+
+    const newVisitorObj = {
+      id: `spot_${Date.now()}`,
+      passcode: newPasscode,
+      name: visitorName.trim(),
+      email: `${phone.trim()}@visitor.spot`,
+      phone: phone.trim(),
+      hostName: hostName.trim(),
+      hostAddress: "Campus Walk-in / Spot Clearance",
+      hostIdDocType: "Official Security Spot Permit",
+      purpose: purpose,
+      arrivalDate: fromDate,
+      exitDate: toDate,
+      durationDays: calculatedDays,
+      idType: idType,
+      idDocName: idDocName || "walk_in_id_scan.jpg",
+      idDocUrl:
+        idDocUrl ||
+        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80",
+      approvalStatus: "Approved",
+      status: "Pending", // Can be auto checked in
+      requestTimestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      blacklisted: false,
+    };
+
+    setGeneratedPass(newVisitorObj);
+    onRegisterSuccess(newVisitorObj, false); // Add to master list
+  };
+
+  const handleImmediateCheckIn = () => {
+    if (generatedPass) {
+      onRegisterSuccess(generatedPass, true); // Mark Inside Campus immediately
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full overflow-hidden flex flex-col">
+        {/* Modal Top Header */}
+        <div className="bg-slate-900 text-white p-5 flex justify-between items-center">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-sky-500/20 text-sky-400 rounded-xl">
+              <UserPlus className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base">Instant Walk-in Spot Registration</h3>
+              <p className="text-xs text-slate-400">
+                Issue immediate gate passes for unscheduled campus entries
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-12 gap-6 max-h-[82vh] overflow-y-auto">
+          {/* Left Form Side */}
+          <div className="md:col-span-7 space-y-4">
+            <form onSubmit={handleCreatePass} className="space-y-3.5">
+              {/* Visitor Name & Phone */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Visitor Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={visitorName}
+                    onChange={(e) => setVisitorName(e.target.value)}
+                    placeholder="e.g. Ramesh Kumar"
+                    className="w-full text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Phone Number *
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="tel"
+                      required
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="e.g. 9876543210"
+                      className="w-full text-xs font-semibold pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Host Name / Department */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Host Name or Department *
+                </label>
+                <div className="relative">
+                  <Building className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    required
+                    value={hostName}
+                    onChange={(e) => setHostName(e.target.value)}
+                    placeholder="e.g. Prof. Sharma / Main Admin Building"
+                    className="w-full text-xs font-semibold pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Purpose of Visit Dropdown */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Purpose of Visit *
+                </label>
+                <select
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value)}
+                  className="w-full text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer"
+                >
+                  <option value="Personal / Guest">Personal / Guest</option>
+                  <option value="Academic Collaboration">Academic Collaboration</option>
+                  <option value="Courier / Delivery">Courier / Delivery</option>
+                  <option value="Facility Maintenance">Facility Maintenance</option>
+                </select>
+              </div>
+
+              {/* Date to Date Picker */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Pass Validity (Date to Date) *
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="relative">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="date"
+                      required
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="w-full text-xs font-semibold pl-9 pr-2 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="date"
+                      required
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="w-full text-xs font-semibold pl-9 pr-2 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="text-[11px] text-sky-700 font-semibold mt-1">
+                  Stay Duration: <strong>{calculatedDays} Days</strong>
+                </div>
+              </div>
+
+              {/* ID Proof Section */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Identification Proof
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={idType}
+                    onChange={(e) => setIdType(e.target.value)}
+                    className="text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white outline-none cursor-pointer"
+                  >
+                    <option value="Aadhaar Card">Aadhaar Card</option>
+                    <option value="Driving License">Driving License</option>
+                    <option value="Voter ID">Voter ID</option>
+                    <option value="Govt Organization ID">Govt Organization ID</option>
+                  </select>
+                  <label className="flex items-center justify-center space-x-1.5 px-3 py-2 border border-dashed border-slate-300 rounded-xl hover:bg-slate-50 cursor-pointer text-xs text-slate-600 transition truncate">
+                    <IdCard className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                    <span className="truncate">{idDocName || "Attach Document"}</span>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold py-2.5 px-4 rounded-xl text-xs transition shadow-md flex items-center justify-center space-x-2 cursor-pointer mt-2"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>Issue Instant Pass & Generate QR</span>
+              </button>
+            </form>
+          </div>
+
+          {/* Right Pass Preview Side */}
+          <div className="md:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col items-center justify-between">
+            <div className="w-full text-center">
+              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
+                Generated Passcard
+              </span>
+
+              {generatedPass ? (
+                <div className="mt-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm w-full flex flex-col items-center">
+                  <div className="w-32 h-32 bg-slate-900 rounded-xl p-2 flex items-center justify-center shadow-inner">
+                    {/* Visual QR Pattern */}
+                    <div className="w-full h-full border-2 border-dashed border-sky-400 rounded-lg flex flex-col items-center justify-center text-white text-center">
+                      <QrCode className="w-12 h-12 text-sky-400 animate-pulse" />
+                      <span className="text-[9px] font-mono mt-1 text-slate-300">SCAN AT GATE</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-center">
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">
+                      Passcode
+                    </span>
+                    <span className="text-xl font-mono font-black text-slate-900">
+                      {generatedPass.passcode}
+                    </span>
+                  </div>
+
+                  <div className="w-full mt-3 pt-3 border-t border-slate-100 text-left space-y-1 text-xs">
+                    <div className="text-slate-800 font-bold truncate">
+                      {generatedPass.name}
+                    </div>
+                    <div className="text-slate-500 text-[11px] truncate">
+                      Host: {generatedPass.hostName}
+                    </div>
+                    <div className="text-[11px] text-sky-700 font-semibold">
+                      Validity: {generatedPass.arrivalDate} ➔ {generatedPass.exitDate}
+                    </div>
+                    <div className="inline-block mt-1 px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                      {generatedPass.purpose}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-center px-4">
+                  <QrCode className="w-10 h-10 stroke-1 text-slate-300 mb-2" />
+                  <p className="text-xs font-medium">
+                    Fill the form and click "Issue Pass" to view verification QR & Passcode.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Check-In CTA */}
+            {generatedPass && (
+              <div className="w-full space-y-2 mt-4">
+                <button
+                  onClick={handleImmediateCheckIn}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Scan & Check-In Now</span>
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="w-full border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Print Slip</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function GuardTerminal({ visitors, onStatusChange, onAddVisitor }) {
   const [query, setQuery] = useState("");
   const [isCamOpen, setIsCamOpen] = useState(false);
+  const [isSpotModalOpen, setIsSpotModalOpen] = useState(false);
 
-  // Feature 3: Overstay Calculation (Inside Campus and duration limit crossed)
+  // Overstay Calculation (Inside Campus and duration limit crossed)
   const isOverstayed = (v) => {
     return v.status === "Inside Campus" && v.durationDays && v.durationDays <= 2;
   };
@@ -118,7 +447,6 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
   const insideCount = visitors.filter((v) => v.status === "Inside Campus").length;
   const pendingCount = visitors.filter((v) => v.status === "Pending").length;
   const overstayedCount = visitors.filter(isOverstayed).length;
-  const blacklistedCount = visitors.filter((v) => v.blacklisted).length;
 
   const filtered = visitors.filter(
     (v) =>
@@ -127,6 +455,16 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
       v.name?.toLowerCase().includes(query.toLowerCase()) ||
       v.hostName?.toLowerCase().includes(query.toLowerCase())
   );
+
+  // Handlers for Spot Pass Creation
+  const handleSpotPassCreated = (newVisitor, autoCheckIn) => {
+    if (onAddVisitor) {
+      onAddVisitor(newVisitor);
+    }
+    if (autoCheckIn && onStatusChange) {
+      onStatusChange(newVisitor.id, "Inside Campus");
+    }
+  };
 
   // Real CSV Audit Log Export Function
   const handleExportCSV = () => {
@@ -177,7 +515,7 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
     document.body.removeChild(link);
   };
 
-  // Optical QR Recognition Handler with Feature 2 Security Checks
+  // Optical QR Recognition Handler
   const handleScanSuccess = (decodedText) => {
     setIsCamOpen(false);
     const matched = visitors.find(
@@ -191,7 +529,6 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
       return;
     }
 
-    // Feature 2: Strict Blacklist Check
     if (matched.blacklisted) {
       alert(
         `🚨 SECURITY ALERT: ${matched.name} (${matched.passcode}) has been BLACKLISTED by Security Admin! Entry is strictly prohibited.`
@@ -227,7 +564,6 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
           </div>
         </div>
 
-        {/* Feature 3: Overstay Alerts Metric */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs text-rose-500 font-semibold uppercase">Overstay Alerts</p>
@@ -262,9 +598,9 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
         </div>
       </div>
 
-      {/* Passcode Search & Optical Scanner Trigger */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div className="relative">
+      {/* Action Bar: Search, Optical Scanner & Instant Spot Pass */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="relative w-full md:w-1/2">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
           <input
             type="text"
@@ -275,13 +611,25 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
           />
         </div>
 
-        <button
-          onClick={() => setIsCamOpen(true)}
-          className="px-4 py-2.5 text-xs font-semibold rounded-xl bg-slate-900 text-white hover:bg-slate-800 flex items-center space-x-2 transition shadow-sm cursor-pointer"
-        >
-          <Camera className="w-4 h-4 text-emerald-400" />
-          <span>Launch Camera Optical Scanner</span>
-        </button>
+        <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
+          {/* Instant Walk-In Spot Pass Button */}
+          <button
+            onClick={() => setIsSpotModalOpen(true)}
+            className="px-4 py-2.5 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-700 text-white flex items-center space-x-2 transition shadow-sm cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>+ Issue Spot Pass</span>
+          </button>
+
+          {/* Launch Scanner */}
+          <button
+            onClick={() => setIsCamOpen(true)}
+            className="px-4 py-2.5 text-xs font-semibold rounded-xl bg-slate-900 text-white hover:bg-slate-800 flex items-center space-x-2 transition shadow-sm cursor-pointer"
+          >
+            <Camera className="w-4 h-4 text-emerald-400" />
+            <span>Optical Scanner</span>
+          </button>
+        </div>
       </div>
 
       {/* Gate Audit Table */}
@@ -293,6 +641,7 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
                 <th className="py-3 px-3">Passcode</th>
                 <th className="py-3 px-3">Visitor Name</th>
                 <th className="py-3 px-3">Host & Location</th>
+                <th className="py-3 px-3">Purpose</th>
                 <th className="py-3 px-3">Clearance</th>
                 <th className="py-3 px-3">Gate Status</th>
                 <th className="py-3 px-3">Check-IN Time</th>
@@ -327,6 +676,12 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
                         {item.hostName} ({item.hostAddress})
                       </div>
                       <div className="text-slate-500 text-[11px]">{item.hostIdDocType}</div>
+                    </td>
+                    <td className="py-3 px-3 text-xs">
+                      <span className="font-semibold text-slate-700">{item.purpose}</span>
+                      <div className="text-[10px] text-slate-400">
+                        {item.arrivalDate} to {item.exitDate}
+                      </div>
                     </td>
                     <td className="py-3 px-3">
                       <span
@@ -409,11 +764,18 @@ export default function GuardTerminal({ visitors, onStatusChange }) {
         </div>
       </div>
 
-      {/* Optical Camera Modal */}
+      {/* Real Optical Camera Scanner Modal */}
       <CameraScannerModal
         isOpen={isCamOpen}
         onClose={() => setIsCamOpen(false)}
         onScanSuccess={handleScanSuccess}
+      />
+
+      {/* Spot Walk-In Pass Registration Modal */}
+      <SpotRegistrationModal
+        isOpen={isSpotModalOpen}
+        onClose={() => setIsSpotModalOpen(false)}
+        onRegisterSuccess={handleSpotPassCreated}
       />
     </div>
   );
