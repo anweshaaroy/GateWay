@@ -10,6 +10,12 @@ import {
   GraduationCap,
   Building,
   Users,
+  Download,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  FileText,
+  ShieldCheck,
 } from "lucide-react";
 
 export default function AdminDesk({
@@ -21,7 +27,48 @@ export default function AdminDesk({
 }) {
   const [filter, setFilter] = useState("ALL");
 
-  // Feature 4: Interactive Demographics & Clearance Analytics
+  // In-built Inspection Modal State (fallback if global modal is not passed)
+  const [activeDoc, setActiveDoc] = useState(null);
+  const [scale, setScale] = useState(1);
+  const [rotation, setRotation] = useState(0);
+
+  // Direct Browser Download Handler
+  const handleDownloadProof = (e, fileUrl, fileName, holderName, docType) => {
+    e.stopPropagation();
+    if (!fileUrl) return;
+
+    const safeFileName =
+      fileName ||
+      `${holderName ? holderName.replace(/\s+/g, "_") : "ID"}_${docType || "Proof"}.jpg`;
+
+    // Trigger Native Download
+    const link = document.createElement("a");
+    link.href = fileUrl;
+    link.download = safeFileName;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleOpenDoc = (docType, docName, holderName, docUrl) => {
+    if (onOpenDocModal) {
+      onOpenDocModal(docType, docName, holderName, docUrl);
+    } else {
+      setActiveDoc({ docType, docName, holderName, docUrl });
+      setScale(1);
+      setRotation(0);
+    }
+  };
+
+  const closeLocalModal = () => {
+    setActiveDoc(null);
+    setScale(1);
+    setRotation(0);
+  };
+
+  // Metrics & Clearance Analytics
   const totalCount = visitors.length;
   const pendingVisitors = visitors.filter(
     (v) => v.approvalStatus === "Pending Approval"
@@ -59,8 +106,7 @@ export default function AdminDesk({
             <span>Security Officer Pre-Approval Desk</span>
           </h2>
           <p className="text-xs text-slate-500">
-            Cross-verify uploaded visitor & host ID proofs before issuing gate
-            clearance
+            Cross-verify and download uploaded visitor & host ID proofs before issuing gate clearance
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -76,7 +122,7 @@ export default function AdminDesk({
         </div>
       </div>
 
-      {/* Feature 4: Visual Analytics Widget */}
+      {/* Visual Analytics Widget */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center space-x-2 mb-4 border-b border-slate-100 pb-3">
           <BarChart3 className="w-5 h-5 text-sky-600" />
@@ -86,7 +132,7 @@ export default function AdminDesk({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-          {/* Ratio 1: Academic vs Personal */}
+          {/* Academic vs Personal */}
           <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
             <div className="flex justify-between font-semibold text-slate-700">
               <span className="flex items-center space-x-1">
@@ -99,26 +145,20 @@ export default function AdminDesk({
               <div
                 className="bg-sky-600 h-full transition-all duration-500"
                 style={{
-                  width: `${
-                    totalCount ? (academicCount / totalCount) * 100 : 50
-                  }%`,
+                  width: `${totalCount ? (academicCount / totalCount) * 100 : 50}%`,
                 }}
               ></div>
               <div
                 className="bg-amber-500 h-full transition-all duration-500"
                 style={{
-                  width: `${
-                    totalCount ? (personalCount / totalCount) * 100 : 50
-                  }%`,
+                  width: `${totalCount ? (personalCount / totalCount) * 100 : 50}%`,
                 }}
               ></div>
             </div>
-            <p className="text-[10px] text-slate-400">
-              Purpose classification ratio
-            </p>
+            <p className="text-[10px] text-slate-400">Purpose classification ratio</p>
           </div>
 
-          {/* Ratio 2: Faculty Quarters vs Hostels */}
+          {/* Faculty Quarters vs Hostels */}
           <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
             <div className="flex justify-between font-semibold text-slate-700">
               <span className="flex items-center space-x-1">
@@ -131,26 +171,20 @@ export default function AdminDesk({
               <div
                 className="bg-emerald-600 h-full transition-all duration-500"
                 style={{
-                  width: `${
-                    totalCount ? (facultyHostCount / totalCount) * 100 : 50
-                  }%`,
+                  width: `${totalCount ? (facultyHostCount / totalCount) * 100 : 50}%`,
                 }}
               ></div>
               <div
                 className="bg-indigo-500 h-full transition-all duration-500"
                 style={{
-                  width: `${
-                    totalCount ? (hostelHostCount / totalCount) * 100 : 50
-                  }%`,
+                  width: `${totalCount ? (hostelHostCount / totalCount) * 100 : 50}%`,
                 }}
               ></div>
             </div>
-            <p className="text-[10px] text-slate-400">
-              Premises allocation distribution
-            </p>
+            <p className="text-[10px] text-slate-400">Premises allocation distribution</p>
           </div>
 
-          {/* Stat 3: Clearance Rate */}
+          {/* Clearance Rate */}
           <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200/60 flex flex-col justify-between">
             <div className="flex justify-between font-semibold text-slate-700">
               <span className="flex items-center space-x-1">
@@ -158,10 +192,7 @@ export default function AdminDesk({
                 <span>Clearance Rate</span>
               </span>
               <span className="text-emerald-700 font-bold">
-                {totalCount
-                  ? Math.round((approvedCount / totalCount) * 100)
-                  : 0}
-                %
+                {totalCount ? Math.round((approvedCount / totalCount) * 100) : 0}%
               </span>
             </div>
             <div className="flex space-x-2 text-[11px]">
@@ -172,9 +203,7 @@ export default function AdminDesk({
                 {blacklistedCount} Flagged
               </span>
             </div>
-            <p className="text-[10px] text-slate-400">
-              Overall gate pass approval ratio
-            </p>
+            <p className="text-[10px] text-slate-400">Overall gate pass approval ratio</p>
           </div>
         </div>
       </div>
@@ -224,52 +253,83 @@ export default function AdminDesk({
                         Requested: <strong>{v.requestTimestamp}</strong>
                       </div>
                     </td>
+
+                    {/* Visitor ID Proof Button with Direct Download */}
                     <td className="py-3 px-3">
-                      <button
-                        onClick={() =>
-                          onOpenDocModal(
-                            v.idType,
-                            v.idDocName,
-                            v.name,
-                            v.idDocUrl
-                          )
-                        }
-                        className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-sky-50 hover:border-sky-500 transition shadow-xs text-xs font-semibold cursor-pointer"
-                      >
-                        <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-extrabold text-sky-700">
-                          {vExt}
-                        </span>
-                        <span className="text-slate-800 underline decoration-slate-300 underline-offset-2 truncate max-w-[95px]">
-                          {v.idDocName}
-                        </span>
-                        <Eye className="w-3.5 h-3.5 text-slate-400" />
-                      </button>
+                      <div className="inline-flex items-center space-x-1">
+                        <button
+                          onClick={() =>
+                            handleOpenDoc(v.idType, v.idDocName, v.name, v.idDocUrl)
+                          }
+                          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-l-xl border border-slate-300 bg-white hover:bg-sky-50 hover:border-sky-500 transition shadow-xs text-xs font-semibold cursor-pointer"
+                          title="Inspect Visitor Proof"
+                        >
+                          <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-extrabold text-sky-700">
+                            {vExt}
+                          </span>
+                          <span className="text-slate-800 underline decoration-slate-300 underline-offset-2 truncate max-w-[85px]">
+                            {v.idDocName}
+                          </span>
+                          <Eye className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
+                        <button
+                          onClick={(e) =>
+                            handleDownloadProof(e, v.idDocUrl, v.idDocName, v.name, v.idType)
+                          }
+                          className="p-1.5 rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 hover:bg-sky-100 hover:text-sky-700 text-slate-600 transition cursor-pointer"
+                          title="Download Visitor ID Proof"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
+
                     <td className="py-3 px-3 text-xs">
                       <div className="font-semibold text-slate-900">{v.hostName}</div>
                       <div className="text-slate-500">{v.hostAddress}</div>
                     </td>
+
+                    {/* Host ID Proof Button with Direct Download */}
                     <td className="py-3 px-3">
-                      <button
-                        onClick={() =>
-                          onOpenDocModal(
-                            v.hostIdDocType,
-                            v.hostDocName,
-                            v.hostName,
-                            v.hostDocUrl
-                          )
-                        }
-                        className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-amber-50 hover:border-amber-500 transition shadow-xs text-xs font-semibold cursor-pointer"
-                      >
-                        <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-extrabold text-amber-700">
-                          {hExt}
-                        </span>
-                        <span className="text-slate-800 underline decoration-slate-300 underline-offset-2">
-                          {v.hostIdDocType}
-                        </span>
-                        <Eye className="w-3.5 h-3.5 text-slate-400" />
-                      </button>
+                      <div className="inline-flex items-center space-x-1">
+                        <button
+                          onClick={() =>
+                            handleOpenDoc(
+                              v.hostIdDocType,
+                              v.hostDocName,
+                              v.hostName,
+                              v.hostDocUrl
+                            )
+                          }
+                          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-l-xl border border-slate-300 bg-white hover:bg-amber-50 hover:border-amber-500 transition shadow-xs text-xs font-semibold cursor-pointer"
+                          title="Inspect Host Proof"
+                        >
+                          <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-extrabold text-amber-700">
+                            {hExt}
+                          </span>
+                          <span className="text-slate-800 underline decoration-slate-300 underline-offset-2">
+                            {v.hostIdDocType}
+                          </span>
+                          <Eye className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
+                        <button
+                          onClick={(e) =>
+                            handleDownloadProof(
+                              e,
+                              v.hostDocUrl,
+                              v.hostDocName,
+                              v.hostName,
+                              v.hostIdDocType
+                            )
+                          }
+                          className="p-1.5 rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 hover:bg-amber-100 hover:text-amber-800 text-slate-600 transition cursor-pointer"
+                          title="Download Host ID Proof"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
+
                     <td className="py-3 px-3">
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
                         Pending Review
@@ -291,7 +351,6 @@ export default function AdminDesk({
                           <X className="w-3.5 h-3.5" />
                           <span>Reject</span>
                         </button>
-                        {/* Feature 2: Toggle Flag Button */}
                         <button
                           onClick={() => onToggleBlacklist(v.id)}
                           className={`p-1.5 rounded-lg border transition cursor-pointer ${
@@ -431,7 +490,6 @@ export default function AdminDesk({
                     </span>
                   </td>
                   <td className="py-3 px-4 text-right">
-                    {/* Feature 2: Toggle Flag in Master Directory */}
                     <button
                       onClick={() => onToggleBlacklist(v.id)}
                       className={`p-1.5 rounded-lg border transition cursor-pointer ${
@@ -454,6 +512,129 @@ export default function AdminDesk({
           </table>
         </div>
       </div>
+
+      {/* Built-in Full-Featured Document Inspection Modal */}
+      {activeDoc && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <FileText className="w-5 h-5 text-sky-400" />
+                <div>
+                  <h4 className="text-sm font-bold tracking-tight">
+                    {activeDoc.docType || "Identification Document"} Viewer
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Campus Security Pre-Clearance Console
+                  </p>
+                </div>
+              </div>
+
+              {/* Toolbar Controls */}
+              <div className="flex items-center space-x-1.5">
+                <button
+                  onClick={() => setScale((s) => Math.min(s + 0.25, 2.5))}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setScale((s) => Math.max(s - 0.25, 0.5))}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setRotation((r) => (r + 90) % 360)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                  title="Rotate Document"
+                >
+                  <RotateCw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) =>
+                    handleDownloadProof(
+                      e,
+                      activeDoc.docUrl,
+                      activeDoc.docName,
+                      activeDoc.holderName,
+                      activeDoc.docType
+                    )
+                  }
+                  className="p-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white transition cursor-pointer"
+                  title="Download File"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={closeLocalModal}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition cursor-pointer"
+                  title="Close Viewer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Holder Info Sub-header */}
+            <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs">
+              <span className="text-slate-600">
+                Holder: <strong className="text-slate-900">{activeDoc.holderName}</strong>
+              </span>
+              <span className="font-mono text-sky-700 font-bold text-[11px] bg-sky-50 border border-sky-200 px-2 py-0.5 rounded">
+                {activeDoc.docName || "id_proof.jpg"}
+              </span>
+            </div>
+
+            {/* Image Preview Canvas */}
+            <div className="p-6 bg-slate-100 flex items-center justify-center min-h-[350px] max-h-[500px] overflow-hidden">
+              <img
+                src={activeDoc.docUrl}
+                alt="ID Document"
+                style={{
+                  transform: `scale(${scale}) rotate(${rotation}deg)`,
+                  transition: "transform 0.2s ease-in-out",
+                }}
+                className="max-h-[380px] w-auto object-contain rounded-lg shadow-md border border-slate-200"
+              />
+            </div>
+
+            {/* Footer with Direct Download Button */}
+            <div className="px-5 py-3.5 bg-white border-t border-slate-200 flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-[11px] text-slate-500 font-medium">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                <span>Digital Security Verification Active</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={(e) =>
+                    handleDownloadProof(
+                      e,
+                      activeDoc.docUrl,
+                      activeDoc.docName,
+                      activeDoc.holderName,
+                      activeDoc.docType
+                    )
+                  }
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition shadow-xs cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Download File</span>
+                </button>
+                <button
+                  onClick={closeLocalModal}
+                  className="px-4 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                >
+                  Dismiss Viewer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
