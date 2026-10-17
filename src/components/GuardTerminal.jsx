@@ -16,6 +16,7 @@ import {
   IdCard,
   Building,
   Phone,
+  Mail,
   CheckCircle,
   QrCode,
   Printer,
@@ -118,6 +119,7 @@ function CameraScannerModal({ isOpen, onClose, onScanSuccess }) {
 function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   const [visitorName, setVisitorName] = useState("");
   const [phone, setPhone] = useState("");
+  const [visitorEmail, setVisitorEmail] = useState("");
   const [hostName, setHostName] = useState("");
   const [purpose, setPurpose] = useState("Personal / Guest");
   const [fromDate, setFromDate] = useState(new Date().toISOString().slice(0, 10));
@@ -126,6 +128,19 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   const [idDocName, setIdDocName] = useState("");
   const [idDocUrl, setIdDocUrl] = useState("");
   const [generatedPass, setGeneratedPass] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setVisitorName("");
+      setPhone("");
+      setVisitorEmail("");
+      setHostName("");
+      setPurpose("Personal / Guest");
+      setGeneratedPass(null);
+      setIdDocName("");
+      setIdDocUrl("");
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -151,17 +166,17 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
       return;
     }
 
-    const randomDigits = Math.floor(1000 + Math.random() * 9000);
-    const newPasscode = `PASS-${randomDigits}`;
+    // Standard 4-digit numeric passcode matching table audit format
+    const randomDigits = Math.floor(1000 + Math.random() * 9000).toString();
 
     const newVisitorObj = {
       id: `spot_${Date.now()}`,
-      passcode: newPasscode,
+      passcode: randomDigits,
       name: visitorName.trim(),
-      email: `${phone.trim()}@visitor.spot`,
+      email: visitorEmail.trim() || `${phone.trim()}@visitor.spot`,
       phone: phone.trim(),
       hostName: hostName.trim(),
-      hostAddress: "Campus Walk-in / Spot Clearance",
+      hostAddress: "Campus Spot Clearance",
       hostIdDocType: "Official Security Spot Permit",
       purpose: purpose,
       arrivalDate: fromDate,
@@ -173,20 +188,51 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
         idDocUrl ||
         "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80",
       approvalStatus: "Approved",
-      status: "Pending", // Can be auto checked in
+      status: "Pending",
       requestTimestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       blacklisted: false,
     };
 
     setGeneratedPass(newVisitorObj);
-    onRegisterSuccess(newVisitorObj, false); // Add to master list
+    onRegisterSuccess(newVisitorObj, false);
   };
 
   const handleImmediateCheckIn = () => {
     if (generatedPass) {
-      onRegisterSuccess(generatedPass, true); // Mark Inside Campus immediately
+      onRegisterSuccess(generatedPass, true);
       onClose();
     }
+  };
+
+  const handleSendEmailPass = () => {
+    if (!generatedPass) return;
+
+    const targetEmail = visitorEmail || generatedPass.email;
+    const subject = encodeURIComponent(`IIT Ropar GateWay: Approved Campus Pass [${generatedPass.passcode}]`);
+    
+    const emailBody = encodeURIComponent(
+`Hello ${generatedPass.name},
+
+Your Spot Gate Pass for IIT Ropar Campus has been issued successfully.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GATE CLEARANCE PASS DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Passcode: ${generatedPass.passcode}
+Visitor Name: ${generatedPass.name}
+Host / Dept: ${generatedPass.hostName}
+Purpose: ${generatedPass.purpose}
+Validity: ${generatedPass.arrivalDate} to ${generatedPass.exitDate} (${generatedPass.durationDays} Days)
+Gate Status: Approved for Instant Entry
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Please show this Passcode or the verification QR code to the security guard at the gate.
+
+Security Administration Desk
+IIT Ropar Main Gate Terminal`
+    );
+
+    window.open(`mailto:${targetEmail}?subject=${subject}&body=${emailBody}`, "_blank");
   };
 
   return (
@@ -248,6 +294,23 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                       className="w-full text-xs font-semibold pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Visitor Email (For e-Pass Dispatch) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Visitor Email Address (Optional for e-Pass)
+                </label>
+                <div className="relative">
+                  <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="email"
+                    value={visitorEmail}
+                    onChange={(e) => setVisitorEmail(e.target.value)}
+                    placeholder="e.g. visitor@gmail.com"
+                    className="w-full text-xs font-semibold pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                  />
                 </div>
               </div>
 
@@ -367,7 +430,6 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
               {generatedPass ? (
                 <div className="mt-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm w-full flex flex-col items-center">
                   <div className="w-32 h-32 bg-slate-900 rounded-xl p-2 flex items-center justify-center shadow-inner">
-                    {/* Visual QR Pattern */}
                     <div className="w-full h-full border-2 border-dashed border-sky-400 rounded-lg flex flex-col items-center justify-center text-white text-center">
                       <QrCode className="w-12 h-12 text-sky-400 animate-pulse" />
                       <span className="text-[9px] font-mono mt-1 text-slate-300">SCAN AT GATE</span>
@@ -376,9 +438,9 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
 
                   <div className="mt-3 text-center">
                     <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">
-                      Passcode
+                      Verification Passcode
                     </span>
-                    <span className="text-xl font-mono font-black text-slate-900">
+                    <span className="text-2xl font-mono font-black text-slate-900 tracking-wider">
                       {generatedPass.passcode}
                     </span>
                   </div>
@@ -408,7 +470,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
               )}
             </div>
 
-            {/* Quick Check-In CTA */}
+            {/* Actions CTA Section */}
             {generatedPass && (
               <div className="w-full space-y-2 mt-4">
                 <button
@@ -418,13 +480,22 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                   <CheckCircle className="w-4 h-4" />
                   <span>Scan & Check-In Now</span>
                 </button>
-                <button
-                  onClick={() => window.print()}
-                  className="w-full border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center space-x-1.5 cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Print Slip</span>
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleSendEmailPass}
+                    className="border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold py-2 px-2.5 rounded-xl text-[11px] transition flex items-center justify-center space-x-1 cursor-pointer truncate"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-sky-600 flex-shrink-0" />
+                    <span>Send e-Pass</span>
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold py-2 px-2.5 rounded-xl text-[11px] transition flex items-center justify-center space-x-1 cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                    <span>Print Slip</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -466,7 +537,7 @@ export default function GuardTerminal({ visitors, onStatusChange, onAddVisitor }
     }
   };
 
-  // Real CSV Audit Log Export Function
+  // CSV Audit Log Export Function
   const handleExportCSV = () => {
     if (!visitors || visitors.length === 0) {
       alert("No visitor audit records found to export.");
@@ -764,7 +835,7 @@ export default function GuardTerminal({ visitors, onStatusChange, onAddVisitor }
         </div>
       </div>
 
-      {/* Real Optical Camera Scanner Modal */}
+      {/* Optical Camera Modal */}
       <CameraScannerModal
         isOpen={isCamOpen}
         onClose={() => setIsCamOpen(false)}
