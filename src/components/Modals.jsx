@@ -144,7 +144,6 @@ export function LargeDocModal({ isOpen, onClose, docData }) {
                 Sample Mock Entry (No Live File Attached)
               </p>
               <p className="text-xs text-slate-400">
-                Notun form theke image ba PDF upload korle ekhane sorasori dekha jabe.
               </p>
             </div>
           )}
