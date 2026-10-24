@@ -11,16 +11,21 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
   const [idNumber, setIdNumber] = useState("");
   const [visitorFile, setVisitorFile] = useState(null);
 
+  // Safe fallback to prevent runtime crashes if activeUser or email is undefined
   const [hostName, setHostName] = useState(
-    activeUser.role === "student"
-      ? `Student ${activeUser.entryNumber || "Resident"}`
-      : `Prof. ${activeUser.email.split("@")[0]}`
+    activeUser?.role === "student"
+      ? `Student ${activeUser?.entryNumber || "Resident"}`
+      : `Prof. ${activeUser?.email?.split("@")[0] || "Faculty"}`
   );
   const [hostAddress, setHostAddress] = useState(
-    activeUser.role === "student" ? "Campus Student Hostel" : "Faculty Residential Enclave"
+    activeUser?.role === "student"
+      ? "Campus Student Hostel"
+      : "Faculty Residential Enclave"
   );
   const [hostIdDocType, setHostIdDocType] = useState(
-    activeUser.role === "student" ? "Student College ID Card" : "Faculty Official ID"
+    activeUser?.role === "student"
+      ? "Student College ID Card"
+      : "Faculty Official ID"
   );
   const [hostFile, setHostFile] = useState(null);
 
@@ -31,7 +36,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleVisitorFile = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
       const ext = file.name.split(".").pop().toLowerCase();
       if (!["jpg", "jpeg", "pdf"].includes(ext)) {
@@ -44,7 +49,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
   };
 
   const handleHostFile = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (file) {
       const ext = file.name.split(".").pop().toLowerCase();
       if (!["jpg", "jpeg", "pdf"].includes(ext)) {
@@ -74,7 +79,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
 
     setIsSubmitting(true);
 
-    // Prepare multipart form data for uploading files and text fields
+    // Prepare multipart form data for uploading documents and payload
     const formData = new FormData();
     formData.append("name", visitorName.trim());
     formData.append("email", visitorEmail.trim());
@@ -139,6 +144,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Left Form Column */}
       <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
           <div className="flex items-center space-x-2">
@@ -146,16 +152,21 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
             <h2 className="font-bold text-slate-800 text-base">Visitor Pre-Registration</h2>
           </div>
           <span className="text-xs text-sky-700 font-semibold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
-            {activeUser.role.toUpperCase()} PORTAL ACTIVE
+            {activeUser?.role?.toUpperCase() || "RESIDENT"} PORTAL ACTIVE
           </span>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Section 1: Visitor Details */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">1. Visitor Details</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              1. Visitor Details
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Visitor Full Name *</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Visitor Full Name *
+                </label>
                 <input
                   type="text"
                   required
@@ -166,7 +177,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Visitor Email Address *</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Visitor Email Address *
+                </label>
                 <input
                   type="email"
                   required
@@ -181,7 +194,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Govt. ID Document *</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Govt. ID Document *
+                  </label>
                   <select
                     value={idType}
                     onChange={(e) => setIdType(e.target.value)}
@@ -205,7 +220,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                     className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono focus:ring-2 focus:ring-sky-500 outline-none"
                   />
                   <p className="text-[10px] text-slate-500 mt-1">
-                    {idType === "Aadhaar Card" ? "Exactly 12 numeric digits required." : "1 letter followed by 7 digits."}
+                    {idType === "Aadhaar Card"
+                      ? "Exactly 12 numeric digits required."
+                      : "1 letter followed by 7 digits."}
                   </p>
                 </div>
               </div>
@@ -225,11 +242,16 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
             </div>
           </div>
 
+          {/* Section 2: Host Details */}
           <div className="space-y-3 pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">2. Host Verification (Resident Details)</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              2. Host Verification (Resident Details)
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Host Name *</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Host Name *
+                </label>
                 <input
                   type="text"
                   required
@@ -239,7 +261,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">Host Address / Hostel *</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Host Address / Hostel *
+                </label>
                 <input
                   type="text"
                   required
@@ -252,7 +276,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
 
             <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200 space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-800 mb-1.5">Host ID Document *</label>
+                <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+                  Host ID Document *
+                </label>
                 <select
                   value={hostIdDocType}
                   onChange={(e) => setHostIdDocType(e.target.value)}
@@ -279,11 +305,16 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
             </div>
           </div>
 
+          {/* Section 3: Visit Window & Purpose */}
           <div className="space-y-3 pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">3. Visit Window & Purpose</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              3. Visit Window & Purpose
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/50 p-3.5 rounded-xl border border-sky-100">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Arrival Date *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Arrival Date *
+                </label>
                 <input
                   type="date"
                   required
@@ -293,7 +324,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Expected Departure Date *</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Expected Departure Date *
+                </label>
                 <input
                   type="date"
                   required
@@ -305,7 +338,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Purpose of Visit</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Purpose of Visit
+              </label>
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
@@ -330,11 +365,14 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
         </form>
       </div>
 
+      {/* Right Column: Pass Preview Card */}
       <div className="lg:col-span-5 flex flex-col items-center justify-center">
         {activePass ? (
           <div className="w-full max-w-sm bg-gradient-to-b from-slate-900 to-slate-950 rounded-3xl p-6 text-white shadow-xl border border-slate-700 relative overflow-hidden">
             <div className="flex justify-between items-center pb-3 border-b border-slate-700">
-              <span className="text-xs font-bold uppercase tracking-wider text-sky-400">CAMPUS VISITOR PASS</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-sky-400">
+                CAMPUS VISITOR PASS
+              </span>
               <span
                 className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
                   activePass.approvalStatus === "Approved"
@@ -355,7 +393,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                 <div className="bg-slate-800/90 p-5 rounded-2xl border border-dashed border-slate-600 text-center">
                   <Lock className="w-8 h-8 mx-auto text-amber-400 mb-1" />
                   <p className="text-xs font-semibold text-slate-300">QR Code Locked</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Activated only when Security Admin grants clearance.</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Activated only when Security Admin grants clearance.
+                  </p>
                 </div>
               )}
               <p className="text-xs text-slate-300 mt-2 font-mono">
