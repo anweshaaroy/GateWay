@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { TicketPlus, Send, QrCode, Lock, MailCheck, Printer } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
+
 export default function ResidentPortal({ activeUser, onPassCreated, activePass }) {
   const [visitorName, setVisitorName] = useState("");
   const [visitorEmail, setVisitorEmail] = useState("");
@@ -10,7 +12,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
   const [visitorFile, setVisitorFile] = useState(null);
 
   const [hostName, setHostName] = useState(
-    activeUser.role === "student" ? `Student ${activeUser.entryNumber || "Resident"}` : `Prof. ${activeUser.email.split('@')[0]}`
+    activeUser.role === "student"
+      ? `Student ${activeUser.entryNumber || "Resident"}`
+      : `Prof. ${activeUser.email.split("@")[0]}`
   );
   const [hostAddress, setHostAddress] = useState(
     activeUser.role === "student" ? "Campus Student Hostel" : "Faculty Residential Enclave"
@@ -24,12 +28,13 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
   const [arrivalDate, setArrivalDate] = useState(today);
   const [exitDate, setExitDate] = useState(today);
   const [purpose, setPurpose] = useState("Personal / Guest");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleVisitorFile = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const ext = file.name.split('.').pop().toLowerCase();
-      if (!['jpg', 'jpeg', 'pdf'].includes(ext)) {
+      const ext = file.name.split(".").pop().toLowerCase();
+      if (!["jpg", "jpeg", "pdf"].includes(ext)) {
         alert("Invalid file format! Please upload ONLY .jpg, .jpeg, or .pdf files.");
         e.target.value = "";
         return;
@@ -41,8 +46,8 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
   const handleHostFile = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const ext = file.name.split('.').pop().toLowerCase();
-      if (!['jpg', 'jpeg', 'pdf'].includes(ext)) {
+      const ext = file.name.split(".").pop().toLowerCase();
+      if (!["jpg", "jpeg", "pdf"].includes(ext)) {
         alert("Invalid file format! Please upload ONLY .jpg, .jpeg, or .pdf files.");
         e.target.value = "";
         return;
@@ -51,7 +56,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (idType === "Aadhaar Card" && !/^\d{12}$/.test(idNumber.trim())) {
@@ -67,42 +72,69 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
       return;
     }
 
-    const d1 = new Date(arrivalDate);
-    const d2 = new Date(exitDate);
-    const durationDays = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24)) + 1;
-    const passcode = Math.floor(1000 + Math.random() * 9000).toString();
-    const now = new Date();
-    const requestTimestamp = now.toISOString().slice(0, 10) + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setIsSubmitting(true);
 
-    const newRecord = {
-      id: "VIS-" + Math.floor(1000 + Math.random() * 9000),
-      passcode,
-      name: visitorName.trim(),
-      email: visitorEmail.trim(),
-      idType,
-      idNumber: idType === "Aadhaar Card" ? "[Aadhaar Redacted]" : idNumber.trim().toUpperCase(),
-      idDocName: visitorFile ? visitorFile.name : "visitor_proof.pdf",
-      idDocUrl: visitorFile ? URL.createObjectURL(visitorFile) : null,
-      hostName: hostName.trim(),
-      hostAddress: hostAddress.trim(),
-      hostIdDocType,
-      hostDocName: hostFile ? hostFile.name : "host_id.jpg",
-      hostDocUrl: hostFile ? URL.createObjectURL(hostFile) : null,
-      purpose,
-      arrivalDate,
-      exitDate,
-      durationDays,
-      approvalStatus: "Pending Approval",
-      status: "Pending",
-      requestTimestamp,
-      blacklisted: false,
-      visitHistory: [],
-    };
+    // Prepare multipart form data for uploading files and text fields
+    const formData = new FormData();
+    formData.append("name", visitorName.trim());
+    formData.append("email", visitorEmail.trim());
+    formData.append("idType", idType);
+    formData.append(
+      "idNumber",
+      idType === "Aadhaar Card" ? "[Aadhaar Redacted]" : idNumber.trim().toUpperCase()
+    );
+    formData.append("hostName", hostName.trim());
+    formData.append("hostAddress", hostAddress.trim());
+    formData.append("hostIdDocType", hostIdDocType);
+    formData.append("arrivalDate", arrivalDate);
+    formData.append("exitDate", exitDate);
+    formData.append("purpose", purpose);
 
-    onPassCreated(newRecord);
-    setVisitorName("");
-    setVisitorEmail("");
-    setIdNumber("");
+    if (visitorFile) formData.append("visitorFile", visitorFile);
+    if (hostFile) formData.append("hostFile", hostFile);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/passes/create-request`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        onPassCreated(data.pass);
+        setVisitorName("");
+        setVisitorEmail("");
+        setIdNumber("");
+        setVisitorFile(null);
+        setHostFile(null);
+        alert("Gate pass request successfully submitted to security desk!");
+      } else {
+        alert("Submission failed: " + (data.message || "Unknown error"));
+      }
+    } catch (err) {
+      console.error("Submission failed:", err);
+      alert("Cannot connect to backend server. Make sure server is running.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSendPassEmail = async () => {
+    if (!activePass || !activePass.email) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/passes/send-email/${activePass.id}`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`e-Pass successfully sent to ${activePass.email}!`);
+      } else {
+        alert("Failed to send email: " + data.message);
+      }
+    } catch (err) {
+      console.error("Email error:", err);
+      alert("Failed to contact email dispatch service.");
+    }
   };
 
   return (
@@ -110,10 +142,10 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
       <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
           <div className="flex items-center space-x-2">
-            <TicketPlus className="w-5 h-5 text-brand-600" />
+            <TicketPlus className="w-5 h-5 text-sky-600" />
             <h2 className="font-bold text-slate-800 text-base">Visitor Pre-Registration</h2>
           </div>
-          <span className="text-xs text-brand-700 font-semibold bg-brand-50 px-2.5 py-1 rounded-lg border border-brand-200">
+          <span className="text-xs text-sky-700 font-semibold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
             {activeUser.role.toUpperCase()} PORTAL ACTIVE
           </span>
         </div>
@@ -130,7 +162,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                   placeholder="e.g. Rahul Sharma"
                   value={visitorName}
                   onChange={(e) => setVisitorName(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
                 />
               </div>
               <div>
@@ -141,7 +173,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                   placeholder="e.g. rahul.sharma@example.com"
                   value={visitorEmail}
                   onChange={(e) => setVisitorEmail(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
                 />
               </div>
             </div>
@@ -153,7 +185,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                   <select
                     value={idType}
                     onChange={(e) => setIdType(e.target.value)}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-brand-500 outline-none"
+                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
                   >
                     <option value="Aadhaar Card">Aadhaar Card</option>
                     <option value="Passport">Passport</option>
@@ -170,7 +202,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                     maxLength={idType === "Aadhaar Card" ? 12 : 8}
                     value={idNumber}
                     onChange={(e) => setIdNumber(e.target.value)}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono focus:ring-2 focus:ring-brand-500 outline-none"
+                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono focus:ring-2 focus:ring-sky-500 outline-none"
                   />
                   <p className="text-[10px] text-slate-500 mt-1">
                     {idType === "Aadhaar Card" ? "Exactly 12 numeric digits required." : "1 letter followed by 7 digits."}
@@ -187,7 +219,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                   type="file"
                   accept=".jpg,.jpeg,.pdf"
                   onChange={handleVisitorFile}
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
+                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
                 />
               </div>
             </div>
@@ -203,7 +235,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                   required
                   value={hostName}
                   onChange={(e) => setHostName(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
                 />
               </div>
               <div>
@@ -213,7 +245,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                   required
                   value={hostAddress}
                   onChange={(e) => setHostAddress(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
                 />
               </div>
             </div>
@@ -224,7 +256,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                 <select
                   value={hostIdDocType}
                   onChange={(e) => setHostIdDocType(e.target.value)}
-                  className="w-full text-sm px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full text-sm px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
                 >
                   <option value="Student College ID Card">Student College ID Card</option>
                   <option value="Faculty Official ID">Faculty Official ID</option>
@@ -249,7 +281,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
 
           <div className="space-y-3 pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">3. Visit Window & Purpose</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-brand-50/50 p-3.5 rounded-xl border border-brand-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/50 p-3.5 rounded-xl border border-sky-100">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">Arrival Date *</label>
                 <input
@@ -257,7 +289,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                   required
                   value={arrivalDate}
                   onChange={(e) => setArrivalDate(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
                 />
               </div>
               <div>
@@ -267,7 +299,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
                   required
                   value={exitDate}
                   onChange={(e) => setExitDate(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-brand-500 outline-none"
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
                 />
               </div>
             </div>
@@ -277,7 +309,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
-                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none"
+                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
               >
                 <option value="Personal / Guest">Personal / Guest</option>
                 <option value="Academic Collaboration">Academic Collaboration</option>
@@ -289,22 +321,27 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
 
           <button
             type="submit"
-            className="w-full mt-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center space-x-2"
+            disabled={isSubmitting}
+            className="w-full mt-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
           >
             <Send className="w-4 h-4" />
-            <span>Submit for Security Approval</span>
+            <span>{isSubmitting ? "Submitting to Server..." : "Submit for Security Approval"}</span>
           </button>
         </form>
       </div>
 
       <div className="lg:col-span-5 flex flex-col items-center justify-center">
         {activePass ? (
-          <div className="w-full max-w-sm bg-gradient-to-b from-brand-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-slate-700 relative overflow-hidden">
+          <div className="w-full max-w-sm bg-gradient-to-b from-slate-900 to-slate-950 rounded-3xl p-6 text-white shadow-xl border border-slate-700 relative overflow-hidden">
             <div className="flex justify-between items-center pb-3 border-b border-slate-700">
-              <span className="text-xs font-bold uppercase tracking-wider text-brand-300">CAMPUS VISITOR PASS</span>
-              <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                activePass.approvalStatus === "Approved" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-              }`}>
+              <span className="text-xs font-bold uppercase tracking-wider text-sky-400">CAMPUS VISITOR PASS</span>
+              <span
+                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                  activePass.approvalStatus === "Approved"
+                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                }`}
+              >
                 {activePass.approvalStatus.toUpperCase()}
               </span>
             </div>
@@ -327,24 +364,58 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
             </div>
 
             <div className="bg-slate-800/80 rounded-xl p-3.5 space-y-1.5 text-xs border border-slate-700">
-              <div className="flex justify-between"><span className="text-slate-400">Visitor:</span> <span className="font-semibold text-slate-200">{activePass.name}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Email:</span> <span className="font-semibold text-slate-200 truncate max-w-[180px]">{activePass.email}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Visitor ID:</span> <span className="font-mono text-emerald-400 font-semibold">{activePass.idType}: {activePass.idNumber}</span></div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Visitor:</span>
+                <span className="font-semibold text-slate-200">{activePass.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Email:</span>
+                <span className="font-semibold text-slate-200 truncate max-w-[180px]">{activePass.email}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Visitor ID:</span>
+                <span className="font-mono text-emerald-400 font-semibold">
+                  {activePass.idType}: {activePass.idNumber}
+                </span>
+              </div>
               <div className="border-t border-slate-700/60 my-1 pt-1"></div>
-              <div className="flex justify-between"><span className="text-slate-400">Host Name:</span> <span className="font-semibold text-slate-200">{activePass.hostName}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Host Address:</span> <span className="font-semibold text-slate-300">{activePass.hostAddress}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Host ID Proof:</span> <span className="font-semibold text-amber-300">{activePass.hostIdDocType}</span></div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Host Name:</span>
+                <span className="font-semibold text-slate-200">{activePass.hostName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Host Address:</span>
+                <span className="font-semibold text-slate-300">{activePass.hostAddress}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Host ID Proof:</span>
+                <span className="font-semibold text-amber-300">{activePass.hostIdDocType}</span>
+              </div>
               <div className="border-t border-slate-700/60 my-1 pt-1"></div>
-              <div className="flex justify-between"><span className="text-slate-400">Stay Window:</span> <span className="font-semibold text-amber-300">{activePass.arrivalDate} to {activePass.exitDate}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Duration:</span> <span className="font-semibold text-slate-200">{activePass.durationDays} Days</span></div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Stay Window:</span>
+                <span className="font-semibold text-amber-300">
+                  {activePass.arrivalDate} to {activePass.exitDate}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Duration:</span>
+                <span className="font-semibold text-slate-200">{activePass.durationDays} Days</span>
+              </div>
             </div>
 
             <div className="flex items-center space-x-2 mt-4">
-              <button onClick={() => alert("Simulation email sent to " + activePass.email)} className="flex-1 bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-medium py-2 rounded-lg transition flex items-center justify-center space-x-1.5">
-                <MailCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Simulate Email</span>
+              <button
+                onClick={handleSendPassEmail}
+                className="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold py-2 rounded-lg transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm"
+              >
+                <MailCheck className="w-3.5 h-3.5" />
+                <span>Send e-Pass</span>
               </button>
-              <button onClick={() => window.print()} className="px-3 bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-medium py-2 rounded-lg transition flex items-center justify-center">
+              <button
+                onClick={() => window.print()}
+                className="px-3 bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-medium py-2 rounded-lg transition flex items-center justify-center cursor-pointer"
+              >
                 <Printer className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -353,7 +424,9 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
           <div className="w-full max-w-sm h-full min-h-[380px] border-2 border-dashed border-slate-300 rounded-3xl flex flex-col items-center justify-center p-6 text-center text-slate-400">
             <QrCode className="w-12 h-12 mb-3 text-slate-300" />
             <p className="font-medium text-slate-600 text-sm">No Active Pass Created Yet</p>
-            <p className="text-xs text-slate-400 mt-1 max-w-[230px]">Pre-register a visitor with host verification details to preview their pass card.</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-[230px]">
+              Pre-register a visitor with host verification details to preview their pass card.
+            </p>
           </div>
         )}
       </div>
