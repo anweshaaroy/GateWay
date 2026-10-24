@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
-import { jwtDecode } from "jwt-decode";
 import { 
   ShieldCheck, 
   ChevronDown, 
@@ -9,54 +8,68 @@ import {
   Briefcase, 
   Building2, 
   Lock, 
-  AlertCircle 
+  AlertCircle,
+  X 
 } from "lucide-react";
 
-export default function LoginModal({ isOpen, onLogin }) {
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
+
+export default function LoginModal({ isOpen, onLogin, onClose }) {
   const [roleSelect, setRoleSelect] = useState("resident");
-  const [residentType, setResidentType] = useState("student"); // "student" | "faculty" | "official"
+  const [residentType, setResidentType] = useState("student");
   const [entryNumber, setEntryNumber] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-
-  const ALLOWED_DOMAINS = ["@iitrpr.ac.in"];
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleGoogleSuccess = (credentialResponse) => {
+  const handleGoogleSuccess = async (credentialResponse) => {
+    // Validate roll number strictly for student resident category
+    if (roleSelect === "resident" && residentType === "student" && !entryNumber.trim()) {
+      setErrorMsg("Please enter your Student Entry / Roll Number before signing in.");
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg("");
+
     try {
-      const decoded = jwtDecode(credentialResponse.credential);
-      const userEmail = decoded.email?.toLowerCase() || "";
-
-      // 1. Strict Domain Whitelisting
-      const isDomainValid = ALLOWED_DOMAINS.some((domain) => userEmail.endsWith(domain));
-
-      if (!isDomainValid) {
-        setErrorMsg(
-          `Access Denied: (${userEmail}) is unauthorized. Only official (@iitrpr.ac.in) accounts are permitted.`
-        );
-        return;
-      }
-
-      // 2. Student Roll Number Requirement
-      if (roleSelect === "resident" && residentType === "student" && !entryNumber.trim()) {
-        setErrorMsg("Please enter your Student Entry / Roll Number before signing in.");
-        return;
-      }
-
-      // 3. Dispatch to App State
-      const finalRole = roleSelect === "resident" ? residentType : roleSelect;
-      onLogin({
-        name: decoded.name,
-        role: finalRole,
-        mainRole: roleSelect,
-        email: userEmail,
-        entryNumber: finalRole === "student" ? entryNumber.trim().toUpperCase() : null,
-        picture: decoded.picture,
-        isVerified: true,
+      // Forward credential token and requested roles to backend auth API
+      const res = await fetch(`${BACKEND_URL}/auth/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: credentialResponse.credential,
+          selectedRole: roleSelect,
+          residentType: roleSelect === "resident" ? residentType : null,
+          entryNumber: roleSelect === "resident" && residentType === "student" ? entryNumber.trim().toUpperCase() : null,
+        }),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `Server authentication failed (Status: ${res.status})`);
+      }
+
+      const data = await res.json();
+
+      if (!data.success) {
+        setErrorMsg(data.message || "Access Denied: Verification failed on server.");
+        setLoading(false);
+        return;
+      }
+
+      // Store authentic session token for future authorized API calls
+      if (data.token) {
+        localStorage.setItem("gateway_token", data.token);
+      }
+
+      if (onLogin) onLogin(data.user);
     } catch (err) {
-      console.error("Token decoding error:", err);
-      setErrorMsg("Authentication failed. Please try again.");
+      console.error("Backend Auth Error:", err);
+      setErrorMsg(err.message || "Cannot contact authentication server. Please check your connection.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -67,34 +80,40 @@ export default function LoginModal({ isOpen, onLogin }) {
   ];
 
   return (
-    /* Full Black Background */
-    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center p-4">
-      {/* Clean White Card */}
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white text-slate-900 rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full p-8 md:p-9 relative">
-        
-        {/* Header Section */}
+        {/* Optional Modal Close Button */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-6 right-6 p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+            title="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* Portal Header */}
         <div className="flex items-center space-x-3.5 mb-6">
-          <div className="bg-[#0284c7] text-white p-3 rounded-2xl shadow-md shadow-sky-500/20">
+          <div className="bg-sky-600 text-white p-3 rounded-2xl shadow-md shadow-sky-500/20">
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
             <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">GateWay Portal</h2>
-            <p className="text-xs text-slate-500 font-medium">
-              IIT Ropar Institutional Access
-            </p>
+            <p className="text-xs text-slate-500 font-medium">IIT Ropar Institutional Access</p>
           </div>
         </div>
 
-        {/* Error Alert Box */}
+        {/* Dynamic Error Box */}
         {errorMsg && (
           <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 flex items-start space-x-2 text-xs text-rose-700 font-semibold leading-relaxed">
-            <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-rose-600" />
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-rose-600" />
             <div>{errorMsg}</div>
           </div>
         )}
 
         <div className="space-y-5">
-          {/* Select Login Portal */}
+          {/* Main Role Dropdown */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
               Select Login Portal *
@@ -105,8 +124,11 @@ export default function LoginModal({ isOpen, onLogin }) {
                 onChange={(e) => {
                   setRoleSelect(e.target.value);
                   setErrorMsg("");
+                  if (e.target.value !== "resident") {
+                    setEntryNumber("");
+                  }
                 }}
-                className="w-full text-sm font-semibold px-4 py-3 rounded-xl border border-slate-300 bg-slate-50/50 hover:bg-white text-slate-800 focus:bg-white focus:ring-2 focus:ring-[#0284c7] focus:border-transparent appearance-none shadow-sm cursor-pointer outline-none transition"
+                className="w-full text-sm font-semibold px-4 py-3 rounded-xl border border-slate-300 bg-slate-50/50 hover:bg-white text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-600 appearance-none shadow-sm cursor-pointer outline-none transition"
               >
                 <option value="resident">Resident: Student / Faculty / Official</option>
                 <option value="admin">Security Admin Desk</option>
@@ -116,7 +138,7 @@ export default function LoginModal({ isOpen, onLogin }) {
             </div>
           </div>
 
-          {/* Resident Sub-Category (Student / Faculty / Official) */}
+          {/* Sub-Category for Residents */}
           {roleSelect === "resident" && (
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
@@ -135,7 +157,7 @@ export default function LoginModal({ isOpen, onLogin }) {
                       }}
                       className={`flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all duration-150 cursor-pointer ${
                         isSelected
-                          ? "border-[#0284c7] bg-sky-50/80 text-[#0284c7] shadow-sm ring-1 ring-[#0284c7]"
+                          ? "border-sky-600 bg-sky-50 text-sky-700 shadow-sm ring-1 ring-sky-600"
                           : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300"
                       }`}
                     >
@@ -148,7 +170,7 @@ export default function LoginModal({ isOpen, onLogin }) {
             </div>
           )}
 
-          {/* Student Roll Number (Only visible for students) */}
+          {/* Roll Number Input (Students Only) */}
           {roleSelect === "resident" && residentType === "student" && (
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
@@ -162,7 +184,7 @@ export default function LoginModal({ isOpen, onLogin }) {
                   value={entryNumber}
                   onChange={(e) => setEntryNumber(e.target.value)}
                   placeholder="e.g. 2024CSB1001"
-                  className="w-full text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-[#0284c7] focus:border-transparent font-mono uppercase tracking-wider outline-none text-slate-800"
+                  className="w-full text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-600 font-mono uppercase tracking-wider outline-none text-slate-800"
                 />
               </div>
               <p className="text-[11px] text-slate-400 mt-1.5">
@@ -171,23 +193,31 @@ export default function LoginModal({ isOpen, onLogin }) {
             </div>
           )}
 
-          {/* Official Google SSO Button */}
+          {/* Google SSO Button & Whitelist Notice */}
           <div className="pt-3 border-t border-slate-100 flex flex-col items-center">
             <div className="w-full flex justify-center py-1">
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={() => setErrorMsg("Google Sign-In failed or was cancelled.")}
-                shape="pill"
-                text="signin_with"
-                theme="outline"
-                size="large"
-                width="100%"
-              />
+              {loading ? (
+                <div className="py-2.5 text-xs font-bold text-sky-600 animate-pulse">
+                  Verifying with Security Server...
+                </div>
+              ) : (
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setErrorMsg("Google Sign-In failed or was cancelled.")}
+                  shape="pill"
+                  text="signin_with"
+                  theme="outline"
+                  size="large"
+                  width="100%"
+                />
+              )}
             </div>
-            
+
             <div className="flex items-center space-x-1.5 text-[11px] text-slate-500 mt-3 font-medium">
               <Lock className="w-3 h-3 text-slate-400" />
-              <span>Requires active <strong className="text-slate-700">@iitrpr.ac.in</strong> account</span>
+              <span>
+                Requires active <strong className="text-slate-700">@iitrpr.ac.in</strong> account
+              </span>
             </div>
           </div>
         </div>
