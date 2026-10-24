@@ -19,21 +19,77 @@ import {
   Maximize2,
 } from "lucide-react";
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
+
 export default function AdminDesk({
-  visitors,
+  visitors = [],
   onApprove,
   onReject,
   onToggleBlacklist,
   onOpenDocModal,
 }) {
   const [filter, setFilter] = useState("ALL");
-
-  // In-built Inspection Modal State
   const [activeDoc, setActiveDoc] = useState(null);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
 
-  // Direct Browser Download Handler
+  // Synchronize visitor approval with backend
+  const handleApprovePass = async (id) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/admin/approve/${id}`, {
+        method: "PATCH",
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (onApprove) onApprove(id);
+      } else {
+        alert("Approval failed: " + data.message);
+      }
+    } catch (err) {
+      console.error("Approve API Error:", err);
+      // Fallback local update if backend is unreachable
+      if (onApprove) onApprove(id);
+    }
+  };
+
+  // Synchronize visitor rejection with backend
+  const handleRejectPass = async (id) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/admin/reject/${id}`, {
+        method: "PATCH",
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (onReject) onReject(id);
+      } else {
+        alert("Reject failed: " + data.message);
+      }
+    } catch (err) {
+      console.error("Reject API Error:", err);
+      if (onReject) onReject(id);
+    }
+  };
+
+  // Synchronize blacklist status toggle with backend
+  const handleToggleBlacklist = async (id, currentStatus) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/admin/blacklist/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blacklisted: !currentStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (onToggleBlacklist) onToggleBlacklist(id);
+      } else {
+        alert("Blacklist update failed: " + data.message);
+      }
+    } catch (err) {
+      console.error("Blacklist API Error:", err);
+      if (onToggleBlacklist) onToggleBlacklist(id);
+    }
+  };
+
   const handleDownloadProof = (e, fileUrl, fileName, holderName, docType) => {
     e.stopPropagation();
     if (!fileUrl) return;
@@ -68,33 +124,26 @@ export default function AdminDesk({
     setRotation(0);
   };
 
-  // Metrics & Clearance Analytics
+  // Safe Analytics Metrics Calculation
   const totalCount = visitors.length;
-  const pendingVisitors = visitors.filter(
-    (v) => v.approvalStatus === "Pending Approval"
-  );
-  const approvedCount = visitors.filter(
-    (v) => v.approvalStatus === "Approved"
-  ).length;
-  const blacklistedCount = visitors.filter((v) => v.blacklisted).length;
-
+  const pendingVisitors = visitors.filter((v) => v?.approvalStatus === "Pending Approval");
+  const approvedCount = visitors.filter((v) => v?.approvalStatus === "Approved").length;
+  const blacklistedCount = visitors.filter((v) => v?.blacklisted).length;
   const academicCount = visitors.filter((v) =>
-    v.purpose?.toLowerCase().includes("academic")
+    v?.purpose?.toLowerCase().includes("academic")
   ).length;
   const personalCount = totalCount - academicCount;
-
   const facultyHostCount = visitors.filter((v) =>
-    v.hostAddress?.toLowerCase().includes("faculty")
+    v?.hostAddress?.toLowerCase().includes("faculty")
   ).length;
   const hostelHostCount = totalCount - facultyHostCount;
 
-  // Filter Directory Logic
   const filteredDirectory =
     filter === "ALL"
       ? visitors
       : filter === "Blacklisted"
-      ? visitors.filter((v) => v.blacklisted)
-      : visitors.filter((v) => v.approvalStatus === filter);
+      ? visitors.filter((v) => v?.blacklisted)
+      : visitors.filter((v) => v?.approvalStatus === filter);
 
   return (
     <div className="space-y-6">
@@ -122,17 +171,14 @@ export default function AdminDesk({
         </div>
       </div>
 
-      {/* Visual Analytics Widget */}
+      {/* Visual Demographic Analytics */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center space-x-2 mb-4 border-b border-slate-100 pb-3">
           <BarChart3 className="w-5 h-5 text-sky-600" />
-          <h3 className="text-sm font-bold text-slate-800">
-            Live Demographic & Security Ratio Meters
-          </h3>
+          <h3 className="text-sm font-bold text-slate-800">Live Demographic & Security Ratio Meters</h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
-          {/* Academic vs Personal */}
           <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
             <div className="flex justify-between font-semibold text-slate-700">
               <span className="flex items-center space-x-1">
@@ -144,21 +190,16 @@ export default function AdminDesk({
             <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
               <div
                 className="bg-sky-600 h-full transition-all duration-500"
-                style={{
-                  width: `${totalCount ? (academicCount / totalCount) * 100 : 50}%`,
-                }}
+                style={{ width: `${totalCount ? (academicCount / totalCount) * 100 : 50}%` }}
               ></div>
               <div
                 className="bg-amber-500 h-full transition-all duration-500"
-                style={{
-                  width: `${totalCount ? (personalCount / totalCount) * 100 : 50}%`,
-                }}
+                style={{ width: `${totalCount ? (personalCount / totalCount) * 100 : 50}%` }}
               ></div>
             </div>
             <p className="text-[10px] text-slate-400">Purpose classification ratio</p>
           </div>
 
-          {/* Faculty Quarters vs Hostels */}
           <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200/60">
             <div className="flex justify-between font-semibold text-slate-700">
               <span className="flex items-center space-x-1">
@@ -170,21 +211,16 @@ export default function AdminDesk({
             <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
               <div
                 className="bg-emerald-600 h-full transition-all duration-500"
-                style={{
-                  width: `${totalCount ? (facultyHostCount / totalCount) * 100 : 50}%`,
-                }}
+                style={{ width: `${totalCount ? (facultyHostCount / totalCount) * 100 : 50}%` }}
               ></div>
               <div
                 className="bg-indigo-500 h-full transition-all duration-500"
-                style={{
-                  width: `${totalCount ? (hostelHostCount / totalCount) * 100 : 50}%`,
-                }}
+                style={{ width: `${totalCount ? (hostelHostCount / totalCount) * 100 : 50}%` }}
               ></div>
             </div>
             <p className="text-[10px] text-slate-400">Premises allocation distribution</p>
           </div>
 
-          {/* Clearance Rate */}
           <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200/60 flex flex-col justify-between">
             <div className="flex justify-between font-semibold text-slate-700">
               <span className="flex items-center space-x-1">
@@ -208,7 +244,7 @@ export default function AdminDesk({
         </div>
       </div>
 
-      {/* Pending Approval Section */}
+      {/* Pending Queue Section */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <h3 className="font-bold text-slate-800 text-sm mb-3 flex items-center space-x-2">
           <UserCheck className="w-4 h-4 text-sky-600" />
@@ -229,8 +265,8 @@ export default function AdminDesk({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {pendingVisitors.map((v) => {
-                const vExt = v.idDocName?.split(".").pop().toUpperCase() || "DOC";
-                const hExt = v.hostDocName?.split(".").pop().toUpperCase() || "DOC";
+                const vExt = v?.idDocName?.split(".").pop().toUpperCase() || "DOC";
+                const hExt = v?.hostDocName?.split(".").pop().toUpperCase() || "DOC";
                 return (
                   <tr
                     key={v.id}
@@ -254,15 +290,11 @@ export default function AdminDesk({
                       </div>
                     </td>
 
-                    {/* Visitor ID Proof Button with Direct Download */}
                     <td className="py-3 px-3">
                       <div className="inline-flex items-center space-x-1">
                         <button
-                          onClick={() =>
-                            handleOpenDoc(v.idType, v.idDocName, v.name, v.idDocUrl)
-                          }
+                          onClick={() => handleOpenDoc(v.idType, v.idDocName, v.name, v.idDocUrl)}
                           className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-l-xl border border-slate-300 bg-white hover:bg-sky-50 hover:border-sky-500 transition shadow-xs text-xs font-semibold cursor-pointer"
-                          title="Inspect Visitor Proof"
                         >
                           <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-extrabold text-sky-700">
                             {vExt}
@@ -277,7 +309,6 @@ export default function AdminDesk({
                             handleDownloadProof(e, v.idDocUrl, v.idDocName, v.name, v.idType)
                           }
                           className="p-1.5 rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 hover:bg-sky-100 hover:text-sky-700 text-slate-600 transition cursor-pointer"
-                          title="Download Visitor ID Proof"
                         >
                           <Download className="w-3.5 h-3.5" />
                         </button>
@@ -289,20 +320,13 @@ export default function AdminDesk({
                       <div className="text-slate-500">{v.hostAddress}</div>
                     </td>
 
-                    {/* Host ID Proof Button with Direct Download */}
                     <td className="py-3 px-3">
                       <div className="inline-flex items-center space-x-1">
                         <button
                           onClick={() =>
-                            handleOpenDoc(
-                              v.hostIdDocType,
-                              v.hostDocName,
-                              v.hostName,
-                              v.hostDocUrl
-                            )
+                            handleOpenDoc(v.hostIdDocType, v.hostDocName, v.hostName, v.hostDocUrl)
                           }
                           className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-l-xl border border-slate-300 bg-white hover:bg-amber-50 hover:border-amber-500 transition shadow-xs text-xs font-semibold cursor-pointer"
-                          title="Inspect Host Proof"
                         >
                           <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-extrabold text-amber-700">
                             {hExt}
@@ -314,16 +338,9 @@ export default function AdminDesk({
                         </button>
                         <button
                           onClick={(e) =>
-                            handleDownloadProof(
-                              e,
-                              v.hostDocUrl,
-                              v.hostDocName,
-                              v.hostName,
-                              v.hostIdDocType
-                            )
+                            handleDownloadProof(e, v.hostDocUrl, v.hostDocName, v.hostName, v.hostIdDocType)
                           }
-                          className="p-1.5 rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 hover:bg-amber-100 hover:text-amber-800 text-slate-600 transition cursor-pointer"
-                          title="Download Host ID Proof"
+                          className="p-1.5 rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 hover:bg-amber-100 text-slate-600 transition cursor-pointer"
                         >
                           <Download className="w-3.5 h-3.5" />
                         </button>
@@ -338,31 +355,26 @@ export default function AdminDesk({
                     <td className="py-3 px-3 text-right">
                       <div className="inline-flex items-center space-x-1.5">
                         <button
-                          onClick={() => onApprove(v.id)}
+                          onClick={() => handleApprovePass(v.id)}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shadow-sm cursor-pointer"
                         >
                           <Check className="w-3.5 h-3.5" />
-                          <span>Approve & QR</span>
+                          <span>Approve</span>
                         </button>
                         <button
-                          onClick={() => onReject(v.id)}
+                          onClick={() => handleRejectPass(v.id)}
                           className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shadow-sm cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
                           <span>Reject</span>
                         </button>
                         <button
-                          onClick={() => onToggleBlacklist(v.id)}
+                          onClick={() => handleToggleBlacklist(v.id, v.blacklisted)}
                           className={`p-1.5 rounded-lg border transition cursor-pointer ${
                             v.blacklisted
                               ? "bg-rose-600 text-white border-rose-700"
                               : "bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 border-slate-200"
                           }`}
-                          title={
-                            v.blacklisted
-                              ? "Remove Flag"
-                              : "Flag / Blacklist Visitor"
-                          }
                         >
                           <ShieldAlert className="w-4 h-4" />
                         </button>
@@ -383,32 +395,28 @@ export default function AdminDesk({
         </div>
       </div>
 
-      {/* Master Directory with Filters */}
+      {/* Master Directory Section */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <div className="flex items-center space-x-2">
             <Clock className="w-5 h-5 text-sky-600" />
-            <h3 className="font-bold text-slate-800 text-base">
-              Campus Registered Visitors Master Directory
-            </h3>
+            <h3 className="font-bold text-slate-800 text-base">Campus Registered Visitors Master Directory</h3>
           </div>
 
           <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-            {["ALL", "Approved", "Pending Approval", "Rejected", "Blacklisted"].map(
-              (type) => (
-                <button
-                  key={type}
-                  onClick={() => setFilter(type)}
-                  className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                    filter === type
-                      ? "bg-white text-sky-700 shadow-xs font-semibold"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  {type === "Pending Approval" ? "Pending" : type}
-                </button>
-              )
-            )}
+            {["ALL", "Approved", "Pending Approval", "Rejected", "Blacklisted"].map((type) => (
+              <button
+                key={type}
+                onClick={() => setFilter(type)}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  filter === type
+                    ? "bg-white text-sky-700 shadow-xs font-semibold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {type === "Pending Approval" ? "Pending" : type}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -444,24 +452,16 @@ export default function AdminDesk({
                   </td>
                   <td className="py-3 px-4 font-medium text-slate-800">
                     {v.name}
-                    <div className="text-[11px] text-slate-400 font-normal">
-                      {v.email}
-                    </div>
+                    <div className="text-[11px] text-slate-400 font-normal">{v.email}</div>
                   </td>
                   <td className="py-3 px-4 text-xs">
                     <div className="font-semibold text-slate-900">{v.hostName}</div>
                     <div className="text-[11px] text-slate-500">{v.hostAddress}</div>
                   </td>
-                  <td className="py-3 px-4 text-xs font-medium text-slate-700">
-                    {v.hostIdDocType}
-                  </td>
+                  <td className="py-3 px-4 text-xs font-medium text-slate-700">{v.hostIdDocType}</td>
                   <td className="py-3 px-4 text-slate-600 text-xs">
-                    <div>
-                      {v.arrivalDate} to {v.exitDate}
-                    </div>
-                    <div className="text-[11px] text-sky-600 font-semibold">
-                      {v.durationDays} Days
-                    </div>
+                    <div>{v.arrivalDate} to {v.exitDate}</div>
+                    <div className="text-[11px] text-sky-600 font-semibold">{v.durationDays} Days</div>
                   </td>
                   <td className="py-3 px-4">
                     <span
@@ -491,17 +491,12 @@ export default function AdminDesk({
                   </td>
                   <td className="py-3 px-4 text-right">
                     <button
-                      onClick={() => onToggleBlacklist(v.id)}
+                      onClick={() => handleToggleBlacklist(v.id, v.blacklisted)}
                       className={`p-1.5 rounded-lg border transition cursor-pointer ${
                         v.blacklisted
                           ? "bg-rose-600 text-white border-rose-700"
                           : "bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 border-slate-200"
                       }`}
-                      title={
-                        v.blacklisted
-                          ? "Remove Flag"
-                          : "Flag / Blacklist Visitor"
-                      }
                     >
                       <ShieldAlert className="w-4 h-4" />
                     </button>
@@ -513,11 +508,10 @@ export default function AdminDesk({
         </div>
       </div>
 
-      {/* Full-Screen Large Document Inspection Modal (MODERATED & FIXED) */}
+      {/* Full-Screen Document Inspection Modal */}
       {activeDoc && (
         <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-6xl w-[96vw] h-[92vh] overflow-hidden flex flex-col transition-all">
-            {/* Modal Header */}
             <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-slate-800 rounded-xl border border-slate-700">
@@ -527,19 +521,15 @@ export default function AdminDesk({
                   <h4 className="text-base font-bold tracking-tight">
                     {activeDoc.docType || "Identification Document"} Viewer
                   </h4>
-                  <p className="text-xs text-slate-400">
-                    Campus Security Pre-Clearance Console
-                  </p>
+                  <p className="text-xs text-slate-400">Campus Security Pre-Clearance Console</p>
                 </div>
               </div>
 
-              {/* Toolbar Controls */}
               <div className="flex items-center space-x-2">
                 <div className="flex items-center bg-slate-800 border border-slate-700 rounded-xl p-1 space-x-1">
                   <button
                     onClick={() => setScale((s) => Math.min(s + 0.25, 3.5))}
                     className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
-                    title="Zoom In"
                   >
                     <ZoomIn className="w-4 h-4" />
                   </button>
@@ -549,7 +539,6 @@ export default function AdminDesk({
                   <button
                     onClick={() => setScale((s) => Math.max(s - 0.25, 0.5))}
                     className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
-                    title="Zoom Out"
                   >
                     <ZoomOut className="w-4 h-4" />
                   </button>
@@ -558,7 +547,6 @@ export default function AdminDesk({
                 <button
                   onClick={() => setRotation((r) => (r + 90) % 360)}
                   className="p-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
-                  title="Rotate Document"
                 >
                   <RotateCw className="w-4 h-4" />
                 </button>
@@ -569,7 +557,6 @@ export default function AdminDesk({
                     setRotation(0);
                   }}
                   className="p-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
-                  title="Reset Zoom & Rotation"
                 >
                   <Maximize2 className="w-4 h-4" />
                 </button>
@@ -585,7 +572,6 @@ export default function AdminDesk({
                     )
                   }
                   className="p-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white transition cursor-pointer"
-                  title="Download File"
                 >
                   <Download className="w-4 h-4" />
                 </button>
@@ -593,14 +579,12 @@ export default function AdminDesk({
                 <button
                   onClick={closeLocalModal}
                   className="p-2 rounded-xl bg-slate-800 border border-slate-700 hover:bg-rose-600 text-slate-300 hover:text-white transition cursor-pointer ml-1"
-                  title="Close Viewer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Holder Info Sub-header */}
             <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-200 flex justify-between items-center text-xs shrink-0">
               <span className="text-slate-600">
                 Holder: <strong className="text-slate-900">{activeDoc.holderName}</strong>
@@ -610,7 +594,6 @@ export default function AdminDesk({
               </span>
             </div>
 
-            {/* Full-view Scrollable Image Preview Area */}
             <div className="flex-1 w-full bg-slate-200/70 overflow-auto flex items-center justify-center p-6 relative">
               <div className="flex items-center justify-center min-w-full min-h-full">
                 <img
@@ -626,7 +609,6 @@ export default function AdminDesk({
               </div>
             </div>
 
-            {/* Footer with Direct Download Button */}
             <div className="px-6 py-3.5 bg-white border-t border-slate-200 flex items-center justify-between shrink-0">
               <div className="flex items-center space-x-2 text-xs text-slate-500 font-medium">
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />
