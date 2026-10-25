@@ -3,6 +3,9 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { httpError } from "../utils/httpError.js";
 import { createUniquePasscode, createUniqueVisitorId } from "../utils/createCodes.js";
 import { writeAudit } from "../utils/audit.js";
+import path from "node:path";
+import fs from "node:fs";
+import { uploadDir } from "../middleware/upload.js";
 
 function dateIsValid(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) return false;
@@ -11,8 +14,8 @@ function dateIsValid(value) {
 }
 
 function fileInfo(file) {
-  if (!file) return { name: "", url: null };
-  return { name: file.originalname, url: `/uploads/${file.filename}` };
+  if (!file) return { name: "", storageName: null };
+  return { name: file.originalname, storageName: file.filename };
 }
 
 export const createVisitorRequest = asyncHandler(async (req, res) => {
@@ -52,14 +55,16 @@ export const createVisitorRequest = asyncHandler(async (req, res) => {
     email,
     idType,
     idNumber: idType === "Aadhaar Card" ? "[Aadhaar Redacted]" : rawIdNumber.toUpperCase(),
-    idDocName: visitorProof.name || "visitor_proof.pdf",
-    idDocUrl: visitorProof.url,
+    idDocName: visitorProof.name || "",
+    idDocUrl: visitorProof.storageName ? "pending" : null,
+    idDocStorageName: visitorProof.storageName,
     hostName,
     hostEmail: req.user.email,
     hostAddress,
     hostIdDocType,
-    hostDocName: hostProof.name || "host_id.jpg",
-    hostDocUrl: hostProof.url,
+    hostDocName: hostProof.name || "",
+    hostDocUrl: hostProof.storageName ? "pending" : null,
+    hostDocStorageName: hostProof.storageName,
     purpose,
     arrivalDate,
     exitDate,
@@ -71,6 +76,9 @@ export const createVisitorRequest = asyncHandler(async (req, res) => {
     visitHistory: [{ action: "REQUEST_CREATED", actor: req.user._id, notes: "Visitor pre-approval request submitted." }],
   });
 
+  visitor.idDocUrl = visitorProof.storageName ? `/api/visitors/${visitor.id}/documents/visitor` : null;
+  visitor.hostDocUrl = hostProof.storageName ? `/api/visitors/${visitor.id}/documents/host` : null;
+  await visitor.save();
   await writeAudit(req, { action: "VISITOR_REQUEST_CREATED", visitor, message: `Visitor request ${visitor.id} submitted.` });
   res.status(201).json({ success: true, message: "Visitor request submitted for approval.", visitor });
 });
@@ -87,4 +95,27 @@ export const getVisitorRequest = asyncHandler(async (req, res) => {
   const hasOperationsAccess = ["admin", "guard"].includes(req.user.role);
   if (!isOwner && !hasOperationsAccess) throw httpError(403, "You cannot view this visitor request.");
   res.json({ success: true, visitor });
+});
+
+
+export const getVisitorDocument = asyncHandler(async (req, res) => {
+  const visitor = await Visitor.findOne({ id: req.params.id }).select("+idDocStorageName +hostDocStorageName requester id");
+  if (!visitor) throw httpError(404, "Visitor request not found.");
+  const isOwner = String(visitor.requester) === String(req.user._id);
+  const hasOperationsAccess = ["admin", "guard"].includes(req.user.role);
+  if (!isOwner && !hasOperationsAccess) throw httpError(403, "You cannot view this identity document.");
+
+  const fieldName = req.params.kind === "visitor" ? "idDocStorageName" : req.params.kind === "host" ? "hostDocStorageName" : null;
+  if (!fieldName) throw httpError(400, "Document kind must be visitor or host.");
+  const storageName = visitor[fieldName];
+  if (!storageName) throw httpError(404, "No document was uploaded for this record.");
+  const safeName = path.basename(storageName);
+  const filePath = path.resolve(uploadDir, safeName);
+  if (!filePath.startsWith(`${path.resolve(uploadDir)}${path.sep}`) || !fs.existsSync(filePath)) {
+    throw httpError(404, "Document file could not be found.");
+  }
+  await writeAudit(req, { action: "VISITOR_DOCUMENT_ACCESSED", visitor, message: `${req.params.kind} identity document accessed for ${visitor.id}.`, metadata: { kind: req.params.kind } });
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.sendFile(filePath, { headers: { "Content-Disposition": "inline" } });
 });
