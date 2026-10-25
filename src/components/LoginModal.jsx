@@ -12,6 +12,7 @@ import {
   X 
 } from "lucide-react";
 
+// Backend API root URL configuration
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
 
 export default function LoginModal({ isOpen, onLogin, onClose }) {
@@ -21,10 +22,11 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Return early if the modal is hidden
   if (!isOpen) return null;
 
   const handleGoogleSuccess = async (credentialResponse) => {
-    // Validate roll number strictly for student resident category
+    // Validate entry/roll number strictly for student residents
     if (roleSelect === "resident" && residentType === "student" && !entryNumber.trim()) {
       setErrorMsg("Please enter your Student Entry / Roll Number before signing in.");
       return;
@@ -34,7 +36,7 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
     setErrorMsg("");
 
     try {
-      // Forward credential token and requested roles to backend auth API
+      // Dispatch credential token and requested roles to backend authentication endpoint
       const res = await fetch(`${BACKEND_URL}/auth/google-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -42,10 +44,14 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
           token: credentialResponse.credential,
           selectedRole: roleSelect,
           residentType: roleSelect === "resident" ? residentType : null,
-          entryNumber: roleSelect === "resident" && residentType === "student" ? entryNumber.trim().toUpperCase() : null,
+          entryNumber:
+            roleSelect === "resident" && residentType === "student"
+              ? entryNumber.trim().toUpperCase()
+              : null,
         }),
       });
 
+      // Handle bad HTTP response codes
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.message || `Server authentication failed (Status: ${res.status})`);
@@ -53,18 +59,27 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
 
       const data = await res.json();
 
+      // Guard against backend verification refusal
       if (!data.success) {
         setErrorMsg(data.message || "Access Denied: Verification failed on server.");
         setLoading(false);
         return;
       }
 
-      // Store authentic session token for future authorized API calls
+      // Store authentic session token under all common keys for backward and forward compatibility
       if (data.token) {
         localStorage.setItem("gateway_token", data.token);
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("authToken", data.token);
       }
 
-      if (onLogin) onLogin(data.user);
+      // Pass user payload with active token attached to parent component
+      if (onLogin) {
+        onLogin({
+          ...data.user,
+          token: data.token,
+        });
+      }
     } catch (err) {
       console.error("Backend Auth Error:", err);
       setErrorMsg(err.message || "Cannot contact authentication server. Please check your connection.");
@@ -73,6 +88,7 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
     }
   };
 
+  // Sub-categories for resident portal
   const residentOptions = [
     { id: "student", label: "Student", icon: GraduationCap },
     { id: "faculty", label: "Faculty", icon: Briefcase },
@@ -193,7 +209,7 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
             </div>
           )}
 
-          {/* Google SSO Button & Whitelist Notice */}
+          {/* Google SSO Button */}
           <div className="pt-3 border-t border-slate-100 flex flex-col items-center">
             <div className="w-full flex justify-center py-1">
               {loading ? (
