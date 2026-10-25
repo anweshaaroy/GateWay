@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import LoginModal from "./components/LoginModal";
 import ResidentPortal from "./components/ResidentPortal";
 import AdminDesk from "./components/AdminDesk";
@@ -6,73 +6,41 @@ import GuardTerminal from "./components/GuardTerminal";
 import { LargeDocModal, QrGeneratedModal } from "./components/Modals";
 import { ShieldCheck, LogOut } from "lucide-react";
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState("resident");
   const [activePass, setActivePass] = useState(null);
-
-  // In-memory visitor directory (No localStorage)
-  const [visitors, setVisitors] = useState([
-    {
-      id: "VIS-9021",
-      passcode: "4102",
-      name: "Vikram Rathore",
-      email: "vikram.rathore@outlook.com",
-      idType: "Aadhaar Card",
-      idNumber: "[Aadhaar Redacted]",
-      idDocName: "vikram_id.jpg",
-      idDocUrl: "https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80",
-      hostName: "Dr. A. Verma",
-      hostEmail: "averma@iitrpr.ac.in",
-      hostAddress: "Faculty Qtr A-102",
-      hostIdDocType: "Faculty Official ID",
-      hostDocName: "faculty_id.jpg",
-      hostDocUrl: null,
-      purpose: "Academic Collaboration",
-      arrivalDate: "2026-10-04",
-      exitDate: "2026-10-05",
-      durationDays: 2,
-      approvalStatus: "Approved",
-      status: "Inside Campus",
-      checkInTime: "04 Oct 2026, 09:15 AM",
-      checkOutTime: "—",
-      requestTimestamp: "2026-10-04 08:30 AM",
-      blacklisted: false,
-      visitHistory: [],
-    },
-    {
-      id: "VIS-9022",
-      passcode: "7829",
-      name: "Pooja Hegde",
-      email: "pooja.hegde@gmail.com",
-      idType: "Passport",
-      idNumber: "Z5829104",
-      idDocName: "pooja_passport.jpg",
-      idDocUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=800&auto=format&fit=crop&q=80",
-      hostName: "Mansi Verma",
-      hostEmail: "mansi.2026csm1042@iitrpr.ac.in",
-      hostAddress: "Girls Hostel 4, Room 218",
-      hostIdDocType: "Student College ID Card",
-      hostDocName: "student_card.jpg",
-      hostDocUrl: null,
-      purpose: "Personal / Guest",
-      arrivalDate: "2026-10-06",
-      exitDate: "2026-10-08",
-      durationDays: 3,
-      approvalStatus: "Pending Approval",
-      status: "Pending",
-      checkInTime: "—",
-      checkOutTime: "—",
-      requestTimestamp: "2026-10-06 10:15 AM",
-      blacklisted: false,
-      visitHistory: [],
-    },
-  ]);
+  const [visitors, setVisitors] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [inspectDoc, setInspectDoc] = useState(null);
   const [approvedQrPass, setApprovedQrPass] = useState(null);
 
-  // Authentication & Dynamic Routing
+  // Fetch all registered visitors from backend API
+  const fetchVisitors = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${BACKEND_URL}/visitors`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.visitors)) {
+        setVisitors(data.visitors);
+      }
+    } catch (err) {
+      console.error("Failed to load visitors from backend:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchVisitors();
+    }
+  }, [currentUser]);
+
+  // Handle portal routing based on user role
   const handleLogin = (user) => {
     setCurrentUser(user);
     if (user.mainRole === "resident" || user.role === "student" || user.role === "faculty") {
@@ -84,35 +52,27 @@ export default function App() {
     }
   };
 
+  // Sign out and clear stored session tokens
   const handleSignOut = () => {
+    localStorage.removeItem("gateway_token");
     setCurrentUser(null);
     setActivePass(null);
     setActiveTab("resident");
+    setVisitors([]);
   };
 
+  // Pre-registration pass creation handler
   const handlePassCreated = (newPass) => {
-    const formattedPass = {
-      ...newPass,
-      id: newPass.id || `VIS-${Math.floor(1000 + Math.random() * 9000)}`,
-      passcode: newPass.passcode || Math.floor(1000 + Math.random() * 9000).toString(),
-      approvalStatus: "Pending Approval",
-      status: "Pending",
-      checkInTime: "—",
-      checkOutTime: "—",
-      requestTimestamp: new Date().toLocaleString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      blacklisted: false,
-      visitHistory: [],
-    };
-    setVisitors((prev) => [formattedPass, ...prev]);
-    setActivePass(formattedPass);
+    setVisitors((prev) => [newPass, ...prev]);
+    setActivePass(newPass);
   };
 
+  // Spot registration handler issued by security guard
+  const handleAddVisitor = (newVisitor) => {
+    setVisitors((prev) => [newVisitor, ...prev]);
+  };
+
+  // Pass approval status sync
   const handleApprove = (id) => {
     setVisitors((prev) =>
       prev.map((v) => (v.id === id ? { ...v, approvalStatus: "Approved" } : v))
@@ -123,38 +83,40 @@ export default function App() {
     }
   };
 
+  // Pass rejection status sync
   const handleReject = (id) => {
     setVisitors((prev) =>
       prev.map((v) => (v.id === id ? { ...v, approvalStatus: "Rejected" } : v))
     );
   };
 
-  // Feature 2: Blacklist / Flag Toggle
+  // Blacklist and security flag status sync
   const handleToggleBlacklist = (id) => {
     setVisitors((prev) =>
       prev.map((v) => (v.id === id ? { ...v, blacklisted: !v.blacklisted } : v))
     );
   };
 
-  // Guard Check-In & Check-Out Tracker
-  const handleStatusChange = (id, newStatus) => {
-    const now = new Date();
-    const formattedDateTime =
-      now.toLocaleDateString("en-GB", {
+  // Campus entry and exit tracking
+  const handleStatusChange = (id, newStatus, timestamp) => {
+    const defaultTime =
+      new Date().toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
       }) +
       ", " +
-      now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+    const recordTime = timestamp || defaultTime;
 
     setVisitors((prev) =>
       prev.map((v) => {
         if (v.id !== id) return v;
         if (newStatus === "Inside Campus") {
-          return { ...v, status: newStatus, checkInTime: formattedDateTime };
+          return { ...v, status: newStatus, checkInTime: recordTime };
         } else if (newStatus === "Completed") {
-          return { ...v, status: newStatus, checkOutTime: formattedDateTime };
+          return { ...v, status: newStatus, checkOutTime: recordTime };
         }
         return { ...v, status: newStatus };
       })
@@ -223,13 +185,14 @@ export default function App() {
               <GuardTerminal
                 visitors={visitors}
                 onStatusChange={handleStatusChange}
+                onAddVisitor={handleAddVisitor}
               />
             )}
           </main>
         </>
       )}
 
-      {/* Global Document Inspection & Approval Modals */}
+      {/* Verification Modals */}
       <LargeDocModal
         isOpen={Boolean(inspectDoc)}
         onClose={() => setInspectDoc(null)}
