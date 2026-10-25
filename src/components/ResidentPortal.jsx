@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TicketPlus, Send, QrCode, Lock, MailCheck, Printer } from "lucide-react";
+import { TicketPlus, Send, QrCode, Lock, MailCheck, Printer, Loader2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
@@ -11,21 +11,19 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
   const [idNumber, setIdNumber] = useState("");
   const [visitorFile, setVisitorFile] = useState(null);
 
-  // Safe fallback to prevent runtime crashes if activeUser or email is undefined
+  // Normalize role check (case-insensitive)
+  const isStudent = activeUser?.role?.toLowerCase() === "student";
+
   const [hostName, setHostName] = useState(
-    activeUser?.role === "student"
-      ? `Student ${activeUser?.entryNumber || "Resident"}`
+    isStudent
+      ? `Student ${activeUser?.entryNumber || activeUser?.email?.split("@")[0] || "Resident"}`
       : `Prof. ${activeUser?.email?.split("@")[0] || "Faculty"}`
   );
   const [hostAddress, setHostAddress] = useState(
-    activeUser?.role === "student"
-      ? "Campus Student Hostel"
-      : "Faculty Residential Enclave"
+    isStudent ? "Campus Student Hostel" : "Faculty Residential Enclave"
   );
   const [hostIdDocType, setHostIdDocType] = useState(
-    activeUser?.role === "student"
-      ? "Student College ID Card"
-      : "Faculty Official ID"
+    isStudent ? "Student College ID Card" : "Faculty Official ID"
   );
   const [hostFile, setHostFile] = useState(null);
 
@@ -77,9 +75,19 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
       return;
     }
 
+    // Retrieve active session token
+    const token =
+      activeUser?.token ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("authToken");
+
+    if (!token) {
+      alert("Session expired or token missing. Please Sign Out and Sign In again with Google.");
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Prepare multipart form data for uploading documents and payload
     const formData = new FormData();
     formData.append("name", visitorName.trim());
     formData.append("email", visitorEmail.trim());
@@ -101,12 +109,15 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
     try {
       const res = await fetch(`${BACKEND_URL}/passes/create-request`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`, // REQUIRED by backend auth middleware
+        },
         body: formData,
       });
 
       const data = await res.json();
       if (data.success) {
-        onPassCreated(data.pass);
+        if (onPassCreated) onPassCreated(data.pass);
         setVisitorName("");
         setVisitorEmail("");
         setIdNumber("");
@@ -114,11 +125,11 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
         setHostFile(null);
         alert("Gate pass request successfully submitted to security desk!");
       } else {
-        alert("Submission failed: " + (data.message || "Unknown error"));
+        alert("Submission failed: " + (data.message || "Unknown server response"));
       }
     } catch (err) {
       console.error("Submission failed:", err);
-      alert("Cannot connect to backend server. Make sure server is running.");
+      alert("Cannot connect to backend server. Make sure your server is running.");
     } finally {
       setIsSubmitting(false);
     }
@@ -126,15 +137,24 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
 
   const handleSendPassEmail = async () => {
     if (!activePass || !activePass.email) return;
+    const token =
+      activeUser?.token ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("authToken");
+
     try {
       const res = await fetch(`${BACKEND_URL}/passes/send-email/${activePass.id}`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       });
       const data = await res.json();
       if (data.success) {
         alert(`e-Pass successfully sent to ${activePass.email}!`);
       } else {
-        alert("Failed to send email: " + data.message);
+        alert("Failed to send email: " + (data.message || "Error"));
       }
     } catch (err) {
       console.error("Email error:", err);
@@ -359,8 +379,17 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
             disabled={isSubmitting}
             className="w-full mt-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
           >
-            <Send className="w-4 h-4" />
-            <span>{isSubmitting ? "Submitting to Server..." : "Submit for Security Approval"}</span>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Submitting to Server...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                <span>Submit for Security Approval</span>
+              </>
+            )}
           </button>
         </form>
       </div>
