@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ShieldAlert,
   UserCheck,
@@ -17,50 +17,105 @@ import {
   FileText,
   ShieldCheck,
   Maximize2,
+  RefreshCw,
 } from "lucide-react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
 
 export default function AdminDesk({
-  visitors = [],
+  visitors: externalVisitors = [],
   onApprove,
   onReject,
   onToggleBlacklist,
   onOpenDocModal,
 }) {
+  const [internalVisitors, setInternalVisitors] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [filter, setFilter] = useState("ALL");
   const [activeDoc, setActiveDoc] = useState(null);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
 
+  // Helper method to resolve available authentication token
+  const getAuthToken = () => {
+    return (
+      localStorage.getItem("gateway_token") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("authToken") ||
+      ""
+    );
+  };
+
+  // Direct backend pass fetching to ensure up-to-date queue
+  const fetchPasses = async () => {
+    setIsLoading(true);
+    const token = getAuthToken();
+    try {
+      const res = await fetch(`${BACKEND_URL}/passes`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.passes)) {
+        setInternalVisitors(data.passes);
+      } else if (Array.isArray(data)) {
+        setInternalVisitors(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch passes from backend:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPasses();
+  }, []);
+
+  const visitors = internalVisitors.length > 0 ? internalVisitors : externalVisitors;
+
+  // Safe identifier and status accessors
+  const getId = (v) => v?.id || v?._id;
+  const getApprovalStatus = (v) => v?.approvalStatus || v?.status || "Pending Approval";
+
   // Synchronize visitor approval with backend
   const handleApprovePass = async (id) => {
+    const token = getAuthToken();
     try {
       const res = await fetch(`${BACKEND_URL}/admin/approve/${id}`, {
         method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       const data = await res.json();
       if (data.success) {
         if (onApprove) onApprove(id);
+        fetchPasses();
       } else {
         alert("Approval failed: " + data.message);
       }
     } catch (err) {
       console.error("Approve API Error:", err);
-      // Fallback local update if backend is unreachable
       if (onApprove) onApprove(id);
     }
   };
 
   // Synchronize visitor rejection with backend
   const handleRejectPass = async (id) => {
+    const token = getAuthToken();
     try {
       const res = await fetch(`${BACKEND_URL}/admin/reject/${id}`, {
         method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       const data = await res.json();
       if (data.success) {
         if (onReject) onReject(id);
+        fetchPasses();
       } else {
         alert("Reject failed: " + data.message);
       }
@@ -72,15 +127,20 @@ export default function AdminDesk({
 
   // Synchronize blacklist status toggle with backend
   const handleToggleBlacklist = async (id, currentStatus) => {
+    const token = getAuthToken();
     try {
       const res = await fetch(`${BACKEND_URL}/admin/blacklist/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ blacklisted: !currentStatus }),
       });
       const data = await res.json();
       if (data.success) {
         if (onToggleBlacklist) onToggleBlacklist(id);
+        fetchPasses();
       } else {
         alert("Blacklist update failed: " + data.message);
       }
@@ -126,8 +186,12 @@ export default function AdminDesk({
 
   // Safe Analytics Metrics Calculation
   const totalCount = visitors.length;
-  const pendingVisitors = visitors.filter((v) => v?.approvalStatus === "Pending Approval");
-  const approvedCount = visitors.filter((v) => v?.approvalStatus === "Approved").length;
+  const pendingVisitors = visitors.filter(
+    (v) => getApprovalStatus(v) === "Pending Approval" || getApprovalStatus(v) === "Pending"
+  );
+  const approvedCount = visitors.filter(
+    (v) => getApprovalStatus(v) === "Approved"
+  ).length;
   const blacklistedCount = visitors.filter((v) => v?.blacklisted).length;
   const academicCount = visitors.filter((v) =>
     v?.purpose?.toLowerCase().includes("academic")
@@ -143,7 +207,11 @@ export default function AdminDesk({
       ? visitors
       : filter === "Blacklisted"
       ? visitors.filter((v) => v?.blacklisted)
-      : visitors.filter((v) => v?.approvalStatus === filter);
+      : visitors.filter(
+          (v) =>
+            getApprovalStatus(v) === filter ||
+            (filter === "Pending Approval" && getApprovalStatus(v) === "Pending")
+        );
 
   return (
     <div className="space-y-6">
@@ -159,6 +227,13 @@ export default function AdminDesk({
           </p>
         </div>
         <div className="flex items-center space-x-2">
+          <button
+            onClick={fetchPasses}
+            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition"
+            title="Refresh passes"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-sky-600" : ""}`} />
+          </button>
           <span className="text-xs font-bold px-3 py-1 bg-amber-100 text-amber-800 rounded-lg border border-amber-200">
             Pending: {pendingVisitors.length}
           </span>
@@ -265,11 +340,12 @@ export default function AdminDesk({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {pendingVisitors.map((v) => {
+                const vid = getId(v);
                 const vExt = v?.idDocName?.split(".").pop().toUpperCase() || "DOC";
                 const hExt = v?.hostDocName?.split(".").pop().toUpperCase() || "DOC";
                 return (
                   <tr
-                    key={v.id}
+                    key={vid}
                     className={`hover:bg-slate-50 transition ${
                       v.blacklisted ? "bg-rose-50/70" : ""
                     }`}
@@ -283,30 +359,30 @@ export default function AdminDesk({
                       )}
                     </td>
                     <td className="py-3 px-3">
-                      <span className="font-semibold text-slate-800">{v.name}</span>
-                      <div className="text-[11px] text-slate-500">{v.email}</div>
+                      <span className="font-semibold text-slate-800">{v.name || v.visitorName}</span>
+                      <div className="text-[11px] text-slate-500">{v.email || v.visitorEmail}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                        Requested: <strong>{v.requestTimestamp}</strong>
+                        Requested: <strong>{v.requestTimestamp || v.createdAt?.slice(0, 10) || "Just now"}</strong>
                       </div>
                     </td>
 
                     <td className="py-3 px-3">
                       <div className="inline-flex items-center space-x-1">
                         <button
-                          onClick={() => handleOpenDoc(v.idType, v.idDocName, v.name, v.idDocUrl)}
+                          onClick={() => handleOpenDoc(v.idType, v.idDocName, v.name || v.visitorName, v.idDocUrl)}
                           className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-l-xl border border-slate-300 bg-white hover:bg-sky-50 hover:border-sky-500 transition shadow-xs text-xs font-semibold cursor-pointer"
                         >
                           <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-extrabold text-sky-700">
                             {vExt}
                           </span>
                           <span className="text-slate-800 underline decoration-slate-300 underline-offset-2 truncate max-w-[85px]">
-                            {v.idDocName}
+                            {v.idDocName || "Visitor_ID"}
                           </span>
                           <Eye className="w-3.5 h-3.5 text-slate-400" />
                         </button>
                         <button
                           onClick={(e) =>
-                            handleDownloadProof(e, v.idDocUrl, v.idDocName, v.name, v.idType)
+                            handleDownloadProof(e, v.idDocUrl, v.idDocName, v.name || v.visitorName, v.idType)
                           }
                           className="p-1.5 rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 hover:bg-sky-100 hover:text-sky-700 text-slate-600 transition cursor-pointer"
                         >
@@ -332,7 +408,7 @@ export default function AdminDesk({
                             {hExt}
                           </span>
                           <span className="text-slate-800 underline decoration-slate-300 underline-offset-2">
-                            {v.hostIdDocType}
+                            {v.hostIdDocType || "Host_Proof"}
                           </span>
                           <Eye className="w-3.5 h-3.5 text-slate-400" />
                         </button>
@@ -355,21 +431,21 @@ export default function AdminDesk({
                     <td className="py-3 px-3 text-right">
                       <div className="inline-flex items-center space-x-1.5">
                         <button
-                          onClick={() => handleApprovePass(v.id)}
+                          onClick={() => handleApprovePass(vid)}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shadow-sm cursor-pointer"
                         >
                           <Check className="w-3.5 h-3.5" />
                           <span>Approve</span>
                         </button>
                         <button
-                          onClick={() => handleRejectPass(v.id)}
+                          onClick={() => handleRejectPass(vid)}
                           className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shadow-sm cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
                           <span>Reject</span>
                         </button>
                         <button
-                          onClick={() => handleToggleBlacklist(v.id, v.blacklisted)}
+                          onClick={() => handleToggleBlacklist(vid, v.blacklisted)}
                           className={`p-1.5 rounded-lg border transition cursor-pointer ${
                             v.blacklisted
                               ? "bg-rose-600 text-white border-rose-700"
@@ -435,74 +511,78 @@ export default function AdminDesk({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredDirectory.map((v) => (
-                <tr
-                  key={v.id}
-                  className={`hover:bg-slate-50 transition ${
-                    v.blacklisted ? "bg-rose-50/60" : ""
-                  }`}
-                >
-                  <td className="py-3 px-4 font-mono font-bold text-sky-700">
-                    {v.passcode}
-                    {v.blacklisted && (
-                      <span className="block text-[10px] text-rose-600 font-sans font-bold">
-                        FLAGGED
+              {filteredDirectory.map((v) => {
+                const vid = getId(v);
+                const approvalStatus = getApprovalStatus(v);
+                return (
+                  <tr
+                    key={vid}
+                    className={`hover:bg-slate-50 transition ${
+                      v.blacklisted ? "bg-rose-50/60" : ""
+                    }`}
+                  >
+                    <td className="py-3 px-4 font-mono font-bold text-sky-700">
+                      {v.passcode}
+                      {v.blacklisted && (
+                        <span className="block text-[10px] text-rose-600 font-sans font-bold">
+                          FLAGGED
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 font-medium text-slate-800">
+                      {v.name || v.visitorName}
+                      <div className="text-[11px] text-slate-400 font-normal">{v.email || v.visitorEmail}</div>
+                    </td>
+                    <td className="py-3 px-4 text-xs">
+                      <div className="font-semibold text-slate-900">{v.hostName}</div>
+                      <div className="text-[11px] text-slate-500">{v.hostAddress}</div>
+                    </td>
+                    <td className="py-3 px-4 text-xs font-medium text-slate-700">{v.hostIdDocType}</td>
+                    <td className="py-3 px-4 text-slate-600 text-xs">
+                      <div>{v.arrivalDate} to {v.exitDate}</div>
+                      <div className="text-[11px] text-sky-600 font-semibold">{v.durationDays} Days</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          approvalStatus === "Approved"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : approvalStatus === "Rejected"
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {approvalStatus}
                       </span>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 font-medium text-slate-800">
-                    {v.name}
-                    <div className="text-[11px] text-slate-400 font-normal">{v.email}</div>
-                  </td>
-                  <td className="py-3 px-4 text-xs">
-                    <div className="font-semibold text-slate-900">{v.hostName}</div>
-                    <div className="text-[11px] text-slate-500">{v.hostAddress}</div>
-                  </td>
-                  <td className="py-3 px-4 text-xs font-medium text-slate-700">{v.hostIdDocType}</td>
-                  <td className="py-3 px-4 text-slate-600 text-xs">
-                    <div>{v.arrivalDate} to {v.exitDate}</div>
-                    <div className="text-[11px] text-sky-600 font-semibold">{v.durationDays} Days</div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                        v.approvalStatus === "Approved"
-                          ? "bg-emerald-100 text-emerald-800"
-                          : v.approvalStatus === "Rejected"
-                          ? "bg-rose-100 text-rose-800"
-                          : "bg-amber-100 text-amber-800"
-                      }`}
-                    >
-                      {v.approvalStatus}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        v.status === "Inside Campus"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : v.status === "Completed"
-                          ? "bg-slate-100 text-slate-600"
-                          : "bg-amber-100 text-amber-700"
-                      }`}
-                    >
-                      {v.status}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <button
-                      onClick={() => handleToggleBlacklist(v.id, v.blacklisted)}
-                      className={`p-1.5 rounded-lg border transition cursor-pointer ${
-                        v.blacklisted
-                          ? "bg-rose-600 text-white border-rose-700"
-                          : "bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 border-slate-200"
-                      }`}
-                    >
-                      <ShieldAlert className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          v.status === "Inside Campus"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : v.status === "Completed"
+                            ? "bg-slate-100 text-slate-600"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {v.status || "Expected"}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        onClick={() => handleToggleBlacklist(vid, v.blacklisted)}
+                        className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                          v.blacklisted
+                            ? "bg-rose-600 text-white border-rose-700"
+                            : "bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 border-slate-200"
+                        }`}
+                      >
+                        <ShieldAlert className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
