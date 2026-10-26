@@ -31,8 +31,11 @@ function getPrivilegedRole(email) {
 }
 
 function isAllowedInstitutionalEmail(email, hostedDomain) {
-  const allowedDomains = String(process.env.ALLOWED_INSTITUTIONAL_DOMAINS || "iitrpr.ac.in,campus.edu")
-    .split(",").map((item) => item.trim().toLowerCase().replace(/^@/, "")).filter(Boolean);
+  // Institutional domain locked strictly to IIT Ropar
+  const allowedDomains = String(process.env.ALLOWED_INSTITUTIONAL_DOMAINS || "iitrpr.ac.in")
+    .split(",")
+    .map((item) => item.trim().toLowerCase().replace(/^@/, ""))
+    .filter(Boolean);
   const domain = email.split("@").pop();
   if (!allowedDomains.includes(domain)) return false;
   const requireHd = String(process.env.REQUIRE_WORKSPACE_HOSTED_DOMAIN || "true").toLowerCase() !== "false";
@@ -75,25 +78,40 @@ export const googleLogin = asyncHandler(async (req, res) => {
     throw httpError(401, "Google must provide a verified email address.");
   }
 
+  // 1. Mandatory Institutional Domain Verification
+  if (!isAllowedInstitutionalEmail(email, payload?.hd)) {
+    await logRejectedLogin(req, email, "Email is not from authorized IIT Ropar domain");
+    throw httpError(403, "Access restricted. Only verified @iitrpr.ac.in accounts are permitted.");
+  }
+
+  const isDemoMode = String(process.env.DEMO_MODE || "false").toLowerCase() === "true";
   const privilegedRole = getPrivilegedRole(email);
   const selectedRole = String(req.body.selectedRole || "resident").trim().toLowerCase();
   const requestedResidentRole = String(req.body.residentType || "student").trim().toLowerCase();
   const entryNumber = String(req.body.entryNumber || "").trim().toUpperCase();
 
-  // Privileged roles come only from server-side email mappings; never trust the role dropdown.
   let assignedRole = privilegedRole;
+
+  // 2. Role Assignment: Demo Mode vs Strict Beta Production Mode
   if (!assignedRole) {
-    if (selectedRole !== "resident") {
-      await logRejectedLogin(req, email, "Attempted to select privileged portal without server mapping");
-      throw httpError(403, "This Google account is not configured for the Admin or Guard portal.");
+    if (selectedRole === "admin" || selectedRole === "guard") {
+      if (isDemoMode) {
+        // Presentation Demo: Allow any verified institutional email to access Admin and Guard roles
+        assignedRole = selectedRole;
+      } else {
+        // Strict Beta/Live: Reject unauthorized attempts to access privileged portals
+        await logRejectedLogin(req, email, "Attempted to select privileged portal without server mapping");
+        throw httpError(403, "This Google account is not configured for the Admin or Guard portal.");
+      }
+    } else {
+      if (!residentRoles.has(requestedResidentRole)) {
+        throw httpError(400, "Select Student, Faculty, or Official as the resident category.");
+      }
+      if (requestedResidentRole === "student" && !entryNumber) {
+        throw httpError(400, "Student entry / roll number is required.");
+      }
+      assignedRole = requestedResidentRole;
     }
-    if (!isAllowedInstitutionalEmail(email, payload?.hd)) {
-      await logRejectedLogin(req, email, "Email is not an allowed institutional Workspace identity");
-      throw httpError(403, "Use a verified Google Workspace account from an allowed institution.");
-    }
-    if (!residentRoles.has(requestedResidentRole)) throw httpError(400, "Select Student, Faculty, or Official as the resident category.");
-    if (requestedResidentRole === "student" && !entryNumber) throw httpError(400, "Student entry / roll number is required.");
-    assignedRole = requestedResidentRole;
   }
 
   let user = await User.findOne({ email });
@@ -119,15 +137,10 @@ export const googleLogin = asyncHandler(async (req, res) => {
   } else {
     user.googleId = payload.sub;
     if (payload.name) user.name = String(payload.name).trim().slice(0, 120);
-    // Always re-apply privileged role mappings from server config. Existing resident roles are not
-    // changed by a role dropdown selection at login.
-    if (privilegedRole) {
-      user.role = privilegedRole;
-      user.residentType = null;
-      user.entryNumber = null;
-    } else if (!residentRoles.has(user.role)) {
-      throw httpError(403, "This account is not eligible for the resident portal.");
-    }
+    // Dynamically assign active portal role for demo mode presentation
+    user.role = assignedRole;
+    user.residentType = residentRoles.has(assignedRole) ? assignedRole : null;
+    user.entryNumber = assignedRole === "student" ? entryNumber : null;
   }
   user.lastLoginAt = new Date();
   await user.save();
