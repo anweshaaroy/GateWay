@@ -18,17 +18,46 @@ export default function App() {
   const [inspectDoc, setInspectDoc] = useState(null);
   const [approvedQrPass, setApprovedQrPass] = useState(null);
 
-  // Fetch all registered visitors from backend API
+  // Helper method to resolve available authentication token
+  const getAuthToken = () => {
+    return (
+      localStorage.getItem("gateway_token") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("authToken") ||
+      ""
+    );
+  };
+
+  // Fetch all registered passes from backend API with authentication headers
   const fetchVisitors = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${BACKEND_URL}/visitors`);
+      const token = getAuthToken();
+
+      let res = await fetch(`${BACKEND_URL}/passes`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        res = await fetch(`${BACKEND_URL}/visitors`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      }
+
       const data = await res.json();
-      if (data.success && Array.isArray(data.visitors)) {
+      if (data.success && Array.isArray(data.passes)) {
+        setVisitors(data.passes);
+      } else if (data.success && Array.isArray(data.visitors)) {
         setVisitors(data.visitors);
+      } else if (Array.isArray(data)) {
+        setVisitors(data);
       }
     } catch (err) {
-      console.error("Failed to load visitors from backend:", err);
+      console.error("Failed to load visitors or passes from backend:", err);
     } finally {
       setLoading(false);
     }
@@ -43,7 +72,12 @@ export default function App() {
   // Handle portal routing based on user role
   const handleLogin = (user) => {
     setCurrentUser(user);
-    if (user.mainRole === "resident" || user.role === "student" || user.role === "faculty") {
+    if (
+      user.mainRole === "resident" ||
+      user.role === "student" ||
+      user.role === "faculty" ||
+      user.role === "official"
+    ) {
       setActiveTab("resident");
     } else if (user.mainRole === "admin" || user.role === "admin") {
       setActiveTab("admin");
@@ -52,9 +86,11 @@ export default function App() {
     }
   };
 
-  // Sign out and clear stored session tokens
+  // Complete sign out and clean up session tokens
   const handleSignOut = () => {
     localStorage.removeItem("gateway_token");
+    localStorage.removeItem("token");
+    localStorage.removeItem("authToken");
     setCurrentUser(null);
     setActivePass(null);
     setActiveTab("resident");
@@ -65,36 +101,50 @@ export default function App() {
   const handlePassCreated = (newPass) => {
     setVisitors((prev) => [newPass, ...prev]);
     setActivePass(newPass);
+    fetchVisitors();
   };
 
   // Spot registration handler issued by security guard
   const handleAddVisitor = (newVisitor) => {
     setVisitors((prev) => [newVisitor, ...prev]);
+    fetchVisitors();
   };
 
   // Pass approval status sync
   const handleApprove = (id) => {
     setVisitors((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, approvalStatus: "Approved" } : v))
+      prev.map((v) => {
+        const vid = v.id || v._id;
+        return vid === id ? { ...v, approvalStatus: "Approved" } : v;
+      })
     );
-    const pass = visitors.find((v) => v.id === id);
+    const pass = visitors.find((v) => (v.id || v._id) === id);
     if (pass) {
       setApprovedQrPass({ ...pass, approvalStatus: "Approved" });
     }
+    fetchVisitors();
   };
 
   // Pass rejection status sync
   const handleReject = (id) => {
     setVisitors((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, approvalStatus: "Rejected" } : v))
+      prev.map((v) => {
+        const vid = v.id || v._id;
+        return vid === id ? { ...v, approvalStatus: "Rejected" } : v;
+      })
     );
+    fetchVisitors();
   };
 
   // Blacklist and security flag status sync
   const handleToggleBlacklist = (id) => {
     setVisitors((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, blacklisted: !v.blacklisted } : v))
+      prev.map((v) => {
+        const vid = v.id || v._id;
+        return vid === id ? { ...v, blacklisted: !v.blacklisted } : v;
+      })
     );
+    fetchVisitors();
   };
 
   // Campus entry and exit tracking
@@ -112,7 +162,8 @@ export default function App() {
 
     setVisitors((prev) =>
       prev.map((v) => {
-        if (v.id !== id) return v;
+        const vid = v.id || v._id;
+        if (vid !== id) return v;
         if (newStatus === "Inside Campus") {
           return { ...v, status: newStatus, checkInTime: recordTime };
         } else if (newStatus === "Completed") {
