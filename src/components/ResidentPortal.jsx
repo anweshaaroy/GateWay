@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { TicketPlus, Send, QrCode, Lock, MailCheck, Printer, Loader2 } from "lucide-react";
+import { TicketPlus, Send, QrCode, Lock, MailCheck, Printer, Loader2, RefreshCw, AlertCircle } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
 
-export default function ResidentPortal({ activeUser, onPassCreated, activePass }) {
+export default function ResidentPortal({ activeUser, onPassCreated, activePass, onRefresh }) {
   const [visitorName, setVisitorName] = useState("");
   const [visitorEmail, setVisitorEmail] = useState("");
   const [idType, setIdType] = useState("Aadhaar Card");
@@ -402,15 +402,29 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
               <span className="text-xs font-bold uppercase tracking-wider text-sky-400">
                 CAMPUS VISITOR PASS
               </span>
-              <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                  activePass.approvalStatus === "Approved"
-                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                    : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                }`}
-              >
-                {activePass.approvalStatus.toUpperCase()}
-              </span>
+              <div className="flex items-center space-x-1.5">
+                {onRefresh && (
+                  <button
+                    type="button"
+                    onClick={onRefresh}
+                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+                    title="Refresh approval status from server"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <span
+                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                    activePass.approvalStatus === "Approved"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      : activePass.approvalStatus === "Rejected"
+                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                      : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  }`}
+                >
+                  {activePass.approvalStatus.toUpperCase()}
+                </span>
+              </div>
             </div>
 
             <div className="my-4 text-center">
@@ -473,13 +487,34 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass }
               </div>
             </div>
 
+            {activePass.approvalStatus !== "Approved" && (
+              <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center space-x-2 text-[11px] text-amber-300 text-left">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>
+                  Requires clearance from the Security Admin Desk before QR pass can be issued or emailed.
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center space-x-2 mt-4">
               <button
                 onClick={handleSendPassEmail}
-                className="flex-1 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold py-2 rounded-lg transition flex items-center justify-center space-x-1.5 cursor-pointer shadow-sm"
+                disabled={activePass.approvalStatus !== "Approved"}
+                className={`flex-1 text-white text-xs font-semibold py-2 rounded-lg transition flex items-center justify-center space-x-1.5 shadow-sm ${
+                  activePass.approvalStatus === "Approved"
+                    ? "bg-sky-600 hover:bg-sky-500 cursor-pointer"
+                    : "bg-slate-700 text-slate-400 cursor-not-allowed opacity-60"
+                }`}
+                title={
+                  activePass.approvalStatus === "Approved"
+                    ? "Send pass by email"
+                    : "Pass must be approved by Security Admin before it can be sent"
+                }
               >
                 <MailCheck className="w-3.5 h-3.5" />
-                <span>Send e-Pass</span>
+                <span>
+                  {activePass.approvalStatus === "Approved" ? "Send e-Pass" : "Awaiting Admin Clearance"}
+                </span>
               </button>
               <button
                 onClick={() => window.print()}

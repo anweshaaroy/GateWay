@@ -7,7 +7,7 @@ export async function writeAudit(req, { action, visitor = null, message = "", me
     visitor: visitor?._id ?? null,
     message,
     metadata,
-    ip: req.ip || "",
-    userAgent: req.get("user-agent") || "",
+    ip: req?.ip || "",
+    userAgent: req?.get?.("user-agent") || "",
   });
 }

@@ -23,10 +23,16 @@ function signToken(user) {
 }
 
 function getPrivilegedRole(email) {
-  const adminEmail = normalizedEmail(process.env.GOOGLE_ADMIN_EMAIL || "admin@iitrpr.ac.in");
-  const guardEmail = normalizedEmail(process.env.GOOGLE_GUARD_EMAIL || "guard@iitrpr.ac.in");
-  if (email === adminEmail) return "admin";
-  if (email === guardEmail) return "guard";
+  const adminEmails = String(process.env.GOOGLE_ADMIN_EMAIL || "admin@iitrpr.ac.in")
+    .split(",")
+    .map(normalizedEmail)
+    .filter(Boolean);
+  const guardEmails = String(process.env.GOOGLE_GUARD_EMAIL || "guard@iitrpr.ac.in")
+    .split(",")
+    .map(normalizedEmail)
+    .filter(Boolean);
+  if (adminEmails.includes(email)) return "admin";
+  if (guardEmails.includes(email)) return "guard";
   return null;
 }
 
@@ -78,14 +84,16 @@ export const googleLogin = asyncHandler(async (req, res) => {
     throw httpError(401, "Google must provide a verified email address.");
   }
 
-  // 1. Mandatory Institutional Domain Verification
-  if (!isAllowedInstitutionalEmail(email, payload?.hd)) {
+  // 1. Determine if the user has a privileged role (admin/guard) by server-side email mapping
+  const isDemoMode = String(process.env.DEMO_MODE || "false").toLowerCase() === "true";
+  const privilegedRole = getPrivilegedRole(email);
+
+  // 2. Mandatory Institutional Domain Verification — privileged emails bypass this check
+  if (!privilegedRole && !isAllowedInstitutionalEmail(email, payload?.hd)) {
     await logRejectedLogin(req, email, "Email is not from authorized IIT Ropar domain");
     throw httpError(403, "Access restricted. Only verified @iitrpr.ac.in accounts are permitted.");
   }
 
-  const isDemoMode = String(process.env.DEMO_MODE || "false").toLowerCase() === "true";
-  const privilegedRole = getPrivilegedRole(email);
   const selectedRole = String(req.body.selectedRole || "resident").trim().toLowerCase();
   const requestedResidentRole = String(req.body.residentType || "student").trim().toLowerCase();
   const entryNumber = String(req.body.entryNumber || "").trim().toUpperCase();
@@ -137,10 +145,17 @@ export const googleLogin = asyncHandler(async (req, res) => {
   } else {
     user.googleId = payload.sub;
     if (payload.name) user.name = String(payload.name).trim().slice(0, 120);
-    // Dynamically assign active portal role for demo mode presentation
-    user.role = assignedRole;
-    user.residentType = residentRoles.has(assignedRole) ? assignedRole : null;
-    user.entryNumber = assignedRole === "student" ? entryNumber : null;
+    // Only overwrite role for privileged users or in demo mode; otherwise keep existing DB role
+    if (privilegedRole) {
+      user.role = privilegedRole;
+      user.residentType = null;
+      user.entryNumber = null;
+    } else if (isDemoMode) {
+      user.role = assignedRole;
+      user.residentType = residentRoles.has(assignedRole) ? assignedRole : null;
+      user.entryNumber = assignedRole === "student" ? entryNumber : null;
+    }
+    // In strict/production mode, keep user's existing role, residentType, and entryNumber
   }
   user.lastLoginAt = new Date();
   await user.save();

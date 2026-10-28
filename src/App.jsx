@@ -4,9 +4,10 @@ import ResidentPortal from "./components/ResidentPortal";
 import AdminDesk from "./components/AdminDesk";
 import GuardTerminal from "./components/GuardTerminal";
 import { LargeDocModal, QrGeneratedModal } from "./components/Modals";
-import { ShieldCheck, LogOut } from "lucide-react";
+import { ShieldCheck, LogOut, Clock } from "lucide-react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
+const SESSION_DURATION_MS = 10 * 60 * 1000; // 10 minutes session limit
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -14,6 +15,7 @@ export default function App() {
   const [activePass, setActivePass] = useState(null);
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(SESSION_DURATION_MS);
 
   const [inspectDoc, setInspectDoc] = useState(null);
   const [approvedQrPass, setApprovedQrPass] = useState(null);
@@ -26,6 +28,117 @@ export default function App() {
       localStorage.getItem("authToken") ||
       ""
     );
+  };
+
+  // Complete sign out and clean up session tokens
+  const handleSignOut = () => {
+    localStorage.removeItem("gateway_token");
+    localStorage.removeItem("token");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("gateway_user");
+    localStorage.removeItem("gateway_session_start");
+    setCurrentUser(null);
+    setActivePass(null);
+    setActiveTab("resident");
+    setVisitors([]);
+    setTimeLeft(SESSION_DURATION_MS);
+  };
+
+  // Handle portal routing based on user role and record session start
+  const handleLogin = (user, isNewSession = true) => {
+    setCurrentUser(user);
+    localStorage.setItem("gateway_user", JSON.stringify(user));
+    if (isNewSession) {
+      localStorage.setItem("gateway_session_start", String(Date.now()));
+    }
+
+    const role = user.mainRole || user.role;
+    if (
+      role === "resident" ||
+      role === "student" ||
+      role === "faculty" ||
+      role === "official"
+    ) {
+      setActiveTab("resident");
+    } else if (role === "admin") {
+      setActiveTab("admin");
+    } else {
+      setActiveTab("guard");
+    }
+  };
+
+  // Restore authenticated session from localStorage on page refresh
+  useEffect(() => {
+    const token = getAuthToken();
+    const sessionStart = Number(localStorage.getItem("gateway_session_start") || 0);
+    const storedUser = localStorage.getItem("gateway_user");
+
+    if (!token || !sessionStart) return;
+
+    const elapsed = Date.now() - sessionStart;
+    if (elapsed >= SESSION_DURATION_MS) {
+      // 10-minute session has expired
+      handleSignOut();
+      return;
+    }
+
+    // Optimistically restore session so page does not flash login modal
+    if (storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        handleLogin(parsed, false);
+      } catch (err) {
+        console.error("Failed to parse stored user session:", err);
+      }
+    }
+
+    // Verify token validity with backend API
+    fetch(`${BACKEND_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Session expired or invalid");
+        return res.json();
+      })
+      .then((data) => {
+        if (data?.success && data?.user) {
+          handleLogin(data.user, false);
+        } else {
+          handleSignOut();
+        }
+      })
+      .catch(() => {
+        // If server cannot authenticate token, log out
+        handleSignOut();
+      });
+  }, []);
+
+  // 10-minute session timer: count down and auto-logout on expiration
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const tick = () => {
+      const sessionStart = Number(localStorage.getItem("gateway_session_start") || Date.now());
+      const elapsed = Date.now() - sessionStart;
+      const remaining = Math.max(0, SESSION_DURATION_MS - elapsed);
+      setTimeLeft(remaining);
+
+      if (remaining <= 0) {
+        alert("Your 10-minute session has expired. Please sign in again.");
+        handleSignOut();
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  const formatSessionTime = (ms) => {
+    const totalSecs = Math.floor(ms / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   // Fetch all registered passes from backend API with authentication headers
@@ -49,12 +162,23 @@ export default function App() {
       }
 
       const data = await res.json();
+      let list = [];
       if (data.success && Array.isArray(data.passes)) {
-        setVisitors(data.passes);
+        list = data.passes;
       } else if (data.success && Array.isArray(data.visitors)) {
-        setVisitors(data.visitors);
+        list = data.visitors;
       } else if (Array.isArray(data)) {
-        setVisitors(data);
+        list = data;
+      }
+      setVisitors(list);
+
+      // Keep activePass synchronized with latest backend status
+      if (list.length > 0) {
+        setActivePass((prev) => {
+          if (!prev) return list[0];
+          const match = list.find((v) => (v.id || v._id) === (prev.id || prev._id));
+          return match || prev;
+        });
       }
     } catch (err) {
       console.error("Failed to load visitors or passes from backend:", err);
@@ -68,34 +192,6 @@ export default function App() {
       fetchVisitors();
     }
   }, [currentUser]);
-
-  // Handle portal routing based on user role
-  const handleLogin = (user) => {
-    setCurrentUser(user);
-    if (
-      user.mainRole === "resident" ||
-      user.role === "student" ||
-      user.role === "faculty" ||
-      user.role === "official"
-    ) {
-      setActiveTab("resident");
-    } else if (user.mainRole === "admin" || user.role === "admin") {
-      setActiveTab("admin");
-    } else {
-      setActiveTab("guard");
-    }
-  };
-
-  // Complete sign out and clean up session tokens
-  const handleSignOut = () => {
-    localStorage.removeItem("gateway_token");
-    localStorage.removeItem("token");
-    localStorage.removeItem("authToken");
-    setCurrentUser(null);
-    setActivePass(null);
-    setActiveTab("resident");
-    setVisitors([]);
-  };
 
   // Pre-registration pass creation handler
   const handlePassCreated = (newPass) => {
@@ -201,6 +297,15 @@ export default function App() {
                   </strong>
                 </div>
 
+                <div
+                  className="hidden md:flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs"
+                  title="Session will expire after 10 minutes"
+                >
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-slate-500">Session:</span>
+                  <strong className="font-mono text-slate-800">{formatSessionTime(timeLeft)}</strong>
+                </div>
+
                 <button
                   onClick={handleSignOut}
                   className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition cursor-pointer"
@@ -219,6 +324,7 @@ export default function App() {
                 activeUser={currentUser}
                 onPassCreated={handlePassCreated}
                 activePass={activePass}
+                onRefresh={fetchVisitors}
               />
             )}
             {activeTab === "admin" && (

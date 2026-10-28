@@ -3,6 +3,7 @@ export function notFound(req, res, _next) {
 }
 
 export function errorHandler(error, _req, res, _next) {
+  if (res.headersSent) return _next(error);
   if (error?.name === "MulterError") {
     const message = error.code === "LIMIT_FILE_SIZE" ? "Each document must be within the upload size limit." : error.message;
     return res.status(400).json({ success: false, message });

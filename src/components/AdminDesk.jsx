@@ -59,6 +59,8 @@ export default function AdminDesk({
       const data = await res.json();
       if (data.success && Array.isArray(data.passes)) {
         setInternalVisitors(data.passes);
+      } else if (data.success && Array.isArray(data.visitors)) {
+        setInternalVisitors(data.visitors);
       } else if (Array.isArray(data)) {
         setInternalVisitors(data);
       }

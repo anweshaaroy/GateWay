@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254, index: true },
   googleId: { type: String, unique: true, sparse: true, index: true },
   role: { type: String, enum: ["student", "faculty", "official", "admin", "guard"], required: true, index: true },
-  residentType: { type: String, enum: ["student", "faculty", "official", null], default: null },
+  residentType: { type: String, enum: ["student", "faculty", "official"], default: null },
   entryNumber: { type: String, trim: true, uppercase: true, default: null },
   isActive: { type: Boolean, default: true, index: true },
   lastLoginAt: { type: Date, default: null },

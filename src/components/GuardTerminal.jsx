@@ -181,9 +181,17 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
     };
 
     try {
+      const token =
+        localStorage.getItem("gateway_token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("authToken") ||
+        "";
       const res = await fetch(`${BACKEND_URL}/guard/spot-pass`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
@@ -524,9 +532,17 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
     setLoadingVisitorId(visitorId);
 
     try {
+      const token =
+        localStorage.getItem("gateway_token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("authToken") ||
+        "";
       const res = await fetch(`${BACKEND_URL}/guard/gate-status/${visitorId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ status: targetStatus, timestamp }),
       });
       const data = await res.json();

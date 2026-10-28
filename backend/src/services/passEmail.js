@@ -47,6 +47,15 @@ export async function sendApprovedPassEmail(req, visitor) {
     return { status: "failed", message: visitor.emailError };
   }
   if (!smtpConfigured()) {
+    if (process.env.NODE_ENV !== "production" || String(process.env.DEMO_MODE || "").toLowerCase() === "true") {
+      console.log(`[Dev/Demo Mode] SMTP not configured. Simulating pass email delivery to ${visitor.email}`);
+      visitor.emailDeliveryStatus = "sent";
+      visitor.emailSentAt = new Date();
+      visitor.emailError = "";
+      await visitor.save();
+      await writeEmailAuditSafely(req, { action: "VISITOR_PASS_EMAIL_SENT", visitor, message: `[Simulated] Approved QR visitor pass emailed to ${visitor.email}.` });
+      return { status: "sent", message: `e-Pass issued! (Simulated email to ${visitor.email} — set SMTP_USER & SMTP_PASS in backend/.env for live delivery)` };
+    }
     visitor.emailDeliveryStatus = "failed";
     visitor.emailError = "SMTP is not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS in backend/.env.";
     await visitor.save();
