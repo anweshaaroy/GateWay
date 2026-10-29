@@ -74,6 +74,7 @@ Manual gate registers in large university campuses and residential institutions 
 - **Domain Whitelisting:** Enforces strict domain ending rules (`@iitrpr.ac.in`, `@campus.edu`), eliminating unauthenticated guest entries.
 - **Contextual Role Routing:** Seamlessly branches access between **Resident**, **Security Admin**, and **Gate Guard** personas.
 - **Roll Number Binding:** Dynamically reveals and binds academic student roll/entry credentials when in student mode.
+- **Google Sign-In + JWT** ID token verified on the server; roles enforced on every API route.
 
 ### 2. `ResidentPortal.jsx` — Visitor Sponsorship Console
 - **KYC Formatting Rules:** Validates 12-digit numeric Aadhaar cards and international alphanumeric Passport formats.
@@ -91,6 +92,7 @@ Manual gate registers in large university campuses and residential institutions 
 - **Hardware Optical Scanning:** Mounts a high-frame camera stream via `html5-qrcode` to decode visitor QR matrices directly.
 - **Multi-Vector Directory Search:** Enables rapid filtering across 4-digit passcodes, visitor names, host apartments, and email addresses.
 - **Overstay Sentinel:** Detects visitors who exceed allowed visit durations while remaining inside the premises.
+- **E-Pass & Spot Pass** Approved QR pass emailed over SMTP; guards can issue walk-in passes.
 - **CSV Data Log:** Instant local export of time-stamped perimeter log data for security archives.
 
 ### 5. `Modals.jsx` — High-Resolution Inspection & Token Engines
