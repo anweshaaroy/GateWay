@@ -27,7 +27,12 @@ export const verifyPass = asyncHandler(async (req, res) => {
 });
 
 export const changeGateStatus = asyncHandler(async (req, res) => {
-  const visitor = await Visitor.findOne({ id: req.params.visitorId });
+  const vid = String(req.params.visitorId || "").trim();
+  const query = [{ id: vid }];
+  if (/^[0-9a-fA-F]{24}$/.test(vid)) {
+    query.push({ _id: vid });
+  }
+  const visitor = await Visitor.findOne({ $or: query });
   if (!visitor) throw httpError(404, "Visitor request not found.");
   const targetStatus = String(req.body?.status || "").trim();
   const eligibility = eligibilityForNextAction(visitor);

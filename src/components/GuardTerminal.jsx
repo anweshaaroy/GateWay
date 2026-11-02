@@ -632,7 +632,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   );
 }
 
-export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisitor }) {
+export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisitor, onRefresh }) {
   const [query, setQuery] = useState("");
   const [isCamOpen, setIsCamOpen] = useState(false);
   const [isSpotModalOpen, setIsSpotModalOpen] = useState(false);
@@ -752,39 +752,114 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
     document.body.removeChild(link);
   };
 
-  const handleScanSuccess = (decodedText) => {
+  const handleScanSuccess = async (decodedText) => {
     setIsCamOpen(false);
-    const textClean = decodedText.trim().toLowerCase();
-    const matched = visitors.find(
-      (v) =>
-        v?.passcode?.toLowerCase() === textClean ||
-        v?.id?.toString().toLowerCase() === textClean ||
-        (v?._id && v._id.toString().toLowerCase() === textClean)
-    );
+    if (!decodedText) return;
+
+    let cleanCode = String(decodedText).trim();
+    // If URL was scanned, extract token or passcode
+    if (cleanCode.includes("/")) {
+      const parts = cleanCode.split("/").filter(Boolean);
+      cleanCode = parts[parts.length - 1] || cleanCode;
+    }
+    if (cleanCode.includes("?")) {
+      const parts = cleanCode.split("?");
+      cleanCode = parts[0] || cleanCode;
+    }
+
+    // Handle possible JSON formatted QR payload
+    let candidates = [cleanCode, cleanCode.toLowerCase()];
+    try {
+      const parsed = JSON.parse(decodedText);
+      if (parsed && typeof parsed === "object") {
+        if (parsed.passcode) candidates.push(String(parsed.passcode).trim(), String(parsed.passcode).trim().toLowerCase());
+        if (parsed.qrToken) candidates.push(String(parsed.qrToken).trim(), String(parsed.qrToken).trim().toLowerCase());
+        if (parsed.id) candidates.push(String(parsed.id).trim(), String(parsed.id).trim().toLowerCase());
+        if (parsed._id) candidates.push(String(parsed._id).trim(), String(parsed._id).trim().toLowerCase());
+      }
+    } catch {
+      // Normal plain-text code
+    }
+
+    // 1. First: Query backend real-time verification endpoint
+    try {
+      const token =
+        localStorage.getItem("gateway_token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("authToken") ||
+        "";
+
+      const res = await fetch(`${BACKEND_URL}/guard/verify/${encodeURIComponent(cleanCode)}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.visitor) {
+          const v = data.visitor;
+          const targetId = v.id || v._id;
+
+          if (!data.eligible) {
+            alert(`⛔ Access Denied: ${data.reason || "Pass is not eligible for entry/exit."}\n\nVisitor: ${v.name}\nPass ID: ${v.id || v.passcode}\nClearance: ${v.approvalStatus}\nCurrent Status: ${v.status}`);
+            return;
+          }
+
+          if (data.action === "CHECK_IN" || v.status !== "Inside Campus") {
+            await handleUpdateGateStatus(targetId, "Inside Campus");
+            alert(`✅ VERIFIED - CHECK-IN RECORDED\n\nVisitor: ${v.name}\nPass ID: ${v.id}\nPasscode: ${v.passcode}\nStatus: Inside Campus`);
+          } else {
+            await handleUpdateGateStatus(targetId, "Completed");
+            alert(`✅ VERIFIED - CHECK-OUT RECORDED\n\nVisitor: ${v.name}\nPass ID: ${v.id}\nPasscode: ${v.passcode}\nStatus: Completed`);
+          }
+
+          if (onRefresh) onRefresh();
+          return;
+        }
+      }
+    } catch (apiErr) {
+      console.warn("Backend real-time verify check failed, evaluating local visitor records:", apiErr);
+    }
+
+    // 2. Fallback: Search in local records across passcode, qrToken, id, and _id
+    const matched = visitors.find((v) => {
+      const pCode = v?.passcode ? String(v.passcode).trim().toLowerCase() : "";
+      const qToken = v?.qrToken ? String(v.qrToken).trim().toLowerCase() : "";
+      const vId = v?.id ? String(v.id).trim().toLowerCase() : "";
+      const mId = v?._id ? String(v._id).trim().toLowerCase() : "";
+
+      return candidates.some((c) => {
+        const cLow = String(c).trim().toLowerCase();
+        return cLow && (cLow === pCode || cLow === qToken || cLow === vId || cLow === mId);
+      });
+    });
 
     if (!matched) {
-      alert(`Access Rejected: Passcode "${decodedText}" not found in current visitor logs!`);
+      alert(`Access Rejected: Scanned code "${cleanCode}" not found in visitor records.\n\nIf this pass was recently created or approved, please click "Refresh" at the top of the terminal and try again.`);
       return;
     }
 
     const visitorId = matched.id || matched._id;
 
     if (matched.blacklisted) {
-      alert(`🚨 SECURITY ALERT: ${matched.name} (${matched.passcode}) is BLACKLISTED! Entry denied.`);
+      alert(`🚨 SECURITY ALERT: ${matched.name} (${matched.passcode || matched.id}) is BLACKLISTED! Entry denied.`);
       return;
     }
     if (matched.approvalStatus !== "Approved") {
-      alert(`Entry Denied: Clearance status is currently "${matched.approvalStatus}".`);
+      alert(`Entry Denied: Clearance status is currently "${matched.approvalStatus}". Approved clearance is required.`);
       return;
     }
 
     if (matched.status !== "Inside Campus") {
-      handleUpdateGateStatus(visitorId, "Inside Campus");
-      alert(`Verified: ${matched.name} (${matched.passcode}) Check-IN recorded successfully!`);
+      await handleUpdateGateStatus(visitorId, "Inside Campus");
+      alert(`✅ VERIFIED - CHECK-IN RECORDED\n\nVisitor: ${matched.name}\nPasscode: ${matched.passcode}\nStatus: Inside Campus`);
     } else {
-      handleUpdateGateStatus(visitorId, "Completed");
-      alert(`Verified: ${matched.name} (${matched.passcode}) Check-OUT recorded successfully!`);
+      await handleUpdateGateStatus(visitorId, "Completed");
+      alert(`✅ VERIFIED - CHECK-OUT RECORDED\n\nVisitor: ${matched.name}\nPasscode: ${matched.passcode}\nStatus: Completed`);
     }
+
+    if (onRefresh) onRefresh();
   };
 
   return (

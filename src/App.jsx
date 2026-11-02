@@ -345,6 +345,7 @@ export default function App() {
                 visitors={visitors}
                 onStatusChange={handleStatusChange}
                 onAddVisitor={handleAddVisitor}
+                onRefresh={fetchVisitors}
               />
             )}
           </main>
