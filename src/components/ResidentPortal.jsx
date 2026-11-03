@@ -20,9 +20,10 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
       ? `Student ${activeUser?.entryNumber || activeUser?.email?.split("@")[0] || "Resident"}`
       : `Prof. ${activeUser?.email?.split("@")[0] || "Faculty"}`
   );
-  const [hostAddress, setHostAddress] = useState(
-    isStudent ? "Campus Student Hostel" : "Faculty Residential Enclave"
+  const [selectedHostel, setSelectedHostel] = useState(
+    isStudent ? "Satluj (Boys Hostel)" : "Faculty Residential Enclave"
   );
+  const [roomNumber, setRoomNumber] = useState("");
   const [hostIdDocType, setHostIdDocType] = useState(
     isStudent ? "Student College ID Card" : "Faculty Official ID"
   );
@@ -98,7 +99,10 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
       idType === "Aadhaar Card" ? "[Aadhaar Redacted]" : idNumber.trim().toUpperCase()
     );
     formData.append("hostName", hostName.trim());
-    formData.append("hostAddress", hostAddress.trim());
+    const finalHostAddress = roomNumber.trim()
+      ? `${selectedHostel}, Room ${roomNumber.trim()}`
+      : selectedHostel;
+    formData.append("hostAddress", finalHostAddress);
     formData.append("hostIdDocType", hostIdDocType);
     formData.append("arrivalDate", arrivalDate);
     formData.append("exitDate", exitDate);
@@ -312,15 +316,34 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Host Address / Hostel *
+                  Host Hostel / Campus Address *
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={hostAddress}
-                  onChange={(e) => setHostAddress(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
-                />
+                <div className="space-y-2">
+                  <select
+                    value={selectedHostel}
+                    onChange={(e) => setSelectedHostel(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer"
+                  >
+                    <option value="Satluj (Boys Hostel)">Satluj (Boys Hostel)</option>
+                    <option value="Beas (Boys Hostel)">Beas (Boys Hostel)</option>
+                    <option value="Chenab (Boys Hostel)">Chenab (Boys Hostel)</option>
+                    <option value="Brahmaputra South (Boys Hostel)">Brahmaputra South (Boys Hostel)</option>
+                    <option value="Brahmaputra North (Boys Hostel)">Brahmaputra North (Boys Hostel)</option>
+                    <option value="Raavi (Girls Hostel)">Raavi (Girls Hostel)</option>
+                    <option value="T6 (Girls Hostel)">T6 (Girls Hostel)</option>
+                    <option value="Chintpurni (Girls Hostel)">Chintpurni (Girls Hostel)</option>
+                    <option value="Faculty Residential Enclave">Faculty Residential Enclave</option>
+                    <option value="Institute Guest House">Institute Guest House</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    placeholder="Room / Block No. (Optional, e.g. Room 204)"
+                    value={roomNumber}
+                    onChange={(e) => setRoomNumber(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                  />
+                </div>
               </div>
             </div>
 
