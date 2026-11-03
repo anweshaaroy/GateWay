@@ -69,6 +69,8 @@ export const createVisitorRequest = asyncHandler(async (req, res) => {
   const visitorProof = fileInfo(visitorFile);
   const hostProof = fileInfo(hostFile);
   const durationDays = Math.round((new Date(`${exitDate}T00:00:00Z`) - new Date(`${arrivalDate}T00:00:00Z`)) / 86400000) + 1;
+  const accompanyingCount = Math.max(0, Math.min(100, parseInt(body.accompanyingCount, 10) || 0));
+  const totalVisitors = 1 + accompanyingCount;
 
   const visitor = await Visitor.create({
     id: await createUniqueVisitorId(),
@@ -79,6 +81,8 @@ export const createVisitorRequest = asyncHandler(async (req, res) => {
     email,
     idType,
     idNumber: idType === "Aadhaar Card" ? "[Aadhaar Redacted]" : rawIdNumber.toUpperCase(),
+    accompanyingCount,
+    totalVisitors,
     idDocName: visitorProof.name,
     idDocUrl: visitorProof.url,
     hostName,

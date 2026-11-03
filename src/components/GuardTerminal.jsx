@@ -274,6 +274,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
   const [idType, setIdType] = useState("Aadhaar Card");
   const [idDocName, setIdDocName] = useState("");
+  const [accompanyingCount, setAccompanyingCount] = useState(0);
   const [generatedPass, setGeneratedPass] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -286,6 +287,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
       setPurpose("Personal / Guest");
       setGeneratedPass(null);
       setIdDocName("");
+      setAccompanyingCount(0);
     }
   }, [isOpen]);
 
@@ -808,7 +810,8 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
 
           if (data.action === "CHECK_IN" || v.status !== "Inside Campus") {
             await handleUpdateGateStatus(targetId, "Inside Campus");
-            alert(`✅ VERIFIED - CHECK-IN RECORDED\n\nVisitor: ${v.name}\nPass ID: ${v.id}\nPasscode: ${v.passcode}\nStatus: Inside Campus`);
+            const headCount = v.totalVisitors || (1 + (Number(v.accompanyingCount) || 0));
+            alert(`✅ VERIFIED - CHECK-IN RECORDED\n\nVisitor: ${v.name}\n👥 Total Headcount: ${headCount} Persons (${headCount > 1 ? `1 Lead + ${v.accompanyingCount || headCount - 1} Accompanying` : "Solo"})\nPass ID: ${v.id}\nPasscode: ${v.passcode}\nStatus: Inside Campus`);
           } else {
             await handleUpdateGateStatus(targetId, "Completed");
             alert(`✅ VERIFIED - CHECK-OUT RECORDED\n\nVisitor: ${v.name}\nPass ID: ${v.id}\nPasscode: ${v.passcode}\nStatus: Completed`);
@@ -853,7 +856,8 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
 
     if (matched.status !== "Inside Campus") {
       await handleUpdateGateStatus(visitorId, "Inside Campus");
-      alert(`✅ VERIFIED - CHECK-IN RECORDED\n\nVisitor: ${matched.name}\nPasscode: ${matched.passcode}\nStatus: Inside Campus`);
+      const headCount = matched.totalVisitors || (1 + (Number(matched.accompanyingCount) || 0));
+      alert(`✅ VERIFIED - CHECK-IN RECORDED\n\nVisitor: ${matched.name}\n👥 Total Headcount: ${headCount} Persons (${headCount > 1 ? `1 Lead + ${matched.accompanyingCount || headCount - 1} Accompanying` : "Solo"})\nPasscode: ${matched.passcode}\nStatus: Inside Campus`);
     } else {
       await handleUpdateGateStatus(visitorId, "Completed");
       alert(`✅ VERIFIED - CHECK-OUT RECORDED\n\nVisitor: ${matched.name}\nPasscode: ${matched.passcode}\nStatus: Completed`);
@@ -990,7 +994,14 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
                         )}
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="font-bold text-slate-800">{item.name}</span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-bold text-slate-800">{item.name}</span>
+                          {(item.totalVisitors > 1 || (Number(item.accompanyingCount) || 0) > 0) && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200" title={`1 Lead + ${item.accompanyingCount || item.totalVisitors - 1} Accompanying`}>
+                              👥 {item.totalVisitors || (1 + (Number(item.accompanyingCount) || 0))}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-slate-500 truncate max-w-[140px]">{item.email}</div>
                       </td>
                       <td className="py-3.5 px-4 text-xs">

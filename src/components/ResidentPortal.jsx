@@ -10,6 +10,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
   const [idType, setIdType] = useState("Aadhaar Card");
   const [idNumber, setIdNumber] = useState("");
   const [visitorFile, setVisitorFile] = useState(null);
+  const [accompanyingCount, setAccompanyingCount] = useState(0);
 
   // Normalize role check (case-insensitive)
   const isStudent = activeUser?.role?.toLowerCase() === "student";
@@ -103,6 +104,8 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
     formData.append("exitDate", exitDate);
     formData.append("purpose", purpose);
 
+    formData.append("accompanyingCount", accompanyingCount);
+    formData.append("totalVisitors", 1 + Number(accompanyingCount));
     if (visitorFile) formData.append("visitorFile", visitorFile);
     if (hostFile) formData.append("hostFile", hostFile);
 
@@ -121,6 +124,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
         setVisitorName("");
         setVisitorEmail("");
         setIdNumber("");
+        setAccompanyingCount(0);
         setVisitorFile(null);
         setHostFile(null);
         alert("Gate pass request successfully submitted to security desk!");
@@ -258,6 +262,32 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                   onChange={handleVisitorFile}
                   className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
                 />
+              </div>
+            </div>
+
+            {/* Accompanying Members / Headcount */}
+            <div className="bg-sky-50/70 p-3.5 rounded-xl border border-sky-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-800">
+                  Accompanying Family / Group Members
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Visiting with family? Enter how many additional persons are accompanying (excluding lead visitor).
+                </p>
+              </div>
+              <div className="flex items-center space-x-2 shrink-0">
+                <span className="text-xs text-slate-500 font-semibold">+</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="30"
+                  value={accompanyingCount}
+                  onChange={(e) => setAccompanyingCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  className="w-20 text-center text-sm font-bold px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                />
+                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 border border-sky-200">
+                  Total: {1 + Number(accompanyingCount)} {1 + Number(accompanyingCount) === 1 ? "Person" : "Persons"}
+                </span>
               </div>
             </div>
           </div>
@@ -459,6 +489,17 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                 <span className="text-slate-400">Visitor ID:</span>
                 <span className="font-mono text-emerald-400 font-semibold">
                   {activePass.idType}: {activePass.idNumber}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Total Headcount:</span>
+                <span className="font-semibold text-emerald-300 flex items-center space-x-1.5">
+                  <span>{activePass.totalVisitors || (1 + (Number(activePass.accompanyingCount) || 0))} Persons</span>
+                  {(Number(activePass.accompanyingCount) || 0) > 0 && (
+                    <span className="text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded border border-sky-400/30">
+                      👥 1+{activePass.accompanyingCount} Group
+                    </span>
+                  )}
                 </span>
               </div>
               <div className="border-t border-slate-700/60 my-1 pt-1"></div>
