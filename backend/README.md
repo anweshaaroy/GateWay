@@ -535,10 +535,10 @@ The following practices are important for maintaining the security and reliabili
 
 ## 17. Contributors
 
-| Name | Contribution |
-|---|---|
-| Mansi Verma | Backend Development |
-| Vishal Huneria | Project Development |
+| Name |
+|---|
+| Mansi Verma |
+| Vishal Huneria |
 
 ---
 
