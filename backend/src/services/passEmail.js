@@ -8,15 +8,15 @@ function escapeHtml(value) {
   })[char]);
 }
 
-function smtpConfigured() {
-  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+function emailConfigured() {
+  return Boolean(process.env.BREVO_API_KEY || (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS));
 }
 
 async function writeEmailAuditSafely(req, event) {
   try {
     await writeAudit(req, event);
   } catch (auditError) {
-    // Email status should reflect SMTP delivery, not a separate audit persistence failure.
+    // Email status should reflect delivery, not a separate audit persistence failure.
     console.error("Could not write pass-email audit event:", auditError.message);
   }
 }
@@ -48,20 +48,20 @@ export async function sendApprovedPassEmail(req, visitor) {
     await writeEmailAuditSafely(req, { action: "VISITOR_PASS_EMAIL_FAILED", visitor, message: "Pass email could not be sent because visitor email is invalid." });
     return { status: "failed", message: visitor.emailError };
   }
-  if (!smtpConfigured()) {
+  if (!emailConfigured()) {
     if (process.env.NODE_ENV !== "production" || String(process.env.DEMO_MODE || "").toLowerCase() === "true") {
-      console.log(`[Dev/Demo Mode] SMTP not configured. Simulating pass email delivery to ${visitor.email}`);
+      console.log(`[Dev/Demo Mode] Email not configured. Simulating pass email delivery to ${visitor.email}`);
       visitor.emailDeliveryStatus = "sent";
       visitor.emailSentAt = new Date();
       visitor.emailError = "";
       await visitor.save();
       await writeEmailAuditSafely(req, { action: "VISITOR_PASS_EMAIL_SENT", visitor, message: `[Simulated] Approved QR visitor pass emailed to ${visitor.email}.` });
-      return { status: "sent", message: `e-Pass issued! (Simulated email to ${visitor.email} — set SMTP_USER & SMTP_PASS in backend/.env for live delivery)` };
+      return { status: "sent", message: `e-Pass issued! (Simulated email to ${visitor.email})` };
     }
     visitor.emailDeliveryStatus = "failed";
-    visitor.emailError = "SMTP is not configured on the server. Please configure SMTP_HOST, SMTP_USER, and SMTP_PASS in Render Environment Variables.";
+    visitor.emailError = "Email service is not configured. Add BREVO_API_KEY in Render Environment Variables.";
     await visitor.save();
-    await writeEmailAuditSafely(req, { action: "VISITOR_PASS_EMAIL_FAILED", visitor, message: "Pass email was not sent because SMTP is not configured." });
+    await writeEmailAuditSafely(req, { action: "VISITOR_PASS_EMAIL_FAILED", visitor, message: "Pass email was not sent because email service is not configured." });
     return { status: "failed", message: visitor.emailError };
   }
 
@@ -74,9 +74,11 @@ export async function sendApprovedPassEmail(req, visitor) {
     const qrBase64 = qrDataUrl.split(",")[1];
     const qrBuffer = Buffer.from(qrBase64, "base64");
     
+    const senderEmail = (process.env.BREVO_SENDER_EMAIL || "anwesharoy0177@gmail.com").trim();
+    const replyToEmail = (process.env.SMTP_USER || "2026csm1042@iitrpr.ac.in").trim();
     let from = process.env.MAIL_FROM;
     if (!from || from.includes("example.com")) {
-      from = `GateWay Campus Visitor Portal <${(process.env.SMTP_USER || "").trim()}>`;
+      from = `GateWay Campus Visitor Portal <${senderEmail}>`;
     }
 
     const passName = escapeHtml(visitor.name);
@@ -88,14 +90,58 @@ export async function sendApprovedPassEmail(req, visitor) {
     const totalCount = visitor.totalVisitors || (1 + (visitor.accompanyingCount || 0));
     const headcountText = totalCount > 1 ? `${totalCount} Persons (1 Lead + ${visitor.accompanyingCount || 0} Accompanying)` : "1 Person (Individual Pass)";
 
+    const emailSubject = `Approved Campus Visitor Pass — ${visitor.id}`;
+    const emailText = `Hello ${visitor.name},\n\nYour visitor pass has been approved.\nPass ID: ${visitor.id}\nHost: ${visitor.hostName}\nPurpose: ${visitor.purpose}\nVisit dates: ${visitor.arrivalDate} to ${visitor.exitDate}\nTotal Headcount: ${headcountText}\n\nPresent the attached QR code at the campus gate. Carry the original identity document and follow campus security instructions. This pass is valid only for the approved dates and may be refused if revoked or blacklisted.`;
+    const emailHtml = `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.55"><div style="max-width:620px;margin:auto;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden"><div style="background:#075985;color:#fff;padding:22px 26px"><h1 style="margin:0;font-size:22px">GateWay Campus Visitor Pass</h1><p style="margin:6px 0 0">Visitor pre-approval confirmation</p></div><div style="padding:24px 26px"><p>Hello ${passName},</p><p>Your campus visitor pass has been <strong style="color:#047857">approved</strong>.</p><table style="width:100%;border-collapse:collapse"><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Pass ID</td><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>${passId}</strong></td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Host</td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${hostName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Purpose</td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${purpose}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Visit dates</td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${arrivalDate} to ${exitDate}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Headcount</td><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>${escapeHtml(headcountText)}</strong></td></tr></table><div style="text-align:center;margin:24px 0"><img src="cid:gateway-pass-qr" alt="Visitor pass QR code" width="220" height="220" style="display:inline-block"/><p style="font-size:12px;color:#64748b">Present this QR code at the gate.</p></div><div style="background:#f8fafc;border-radius:10px;padding:14px;font-size:13px"><strong>Important instructions</strong><ul><li>Carry the original identity document submitted with your request.</li><li>Pass is valid only during the approved visit dates.</li><li>Gate entry is subject to final security verification.</li></ul></div><p style="font-size:12px;color:#64748b;margin-top:22px">This message was generated automatically by GateWay. Do not reply to this email.</p></div></div></body></html>`;
+
+    // 1. If Brevo API key is available, use HTTPS (Port 443) — bypasses Render SMTP port blocks
+    if (process.env.BREVO_API_KEY && process.env.BREVO_API_KEY.trim()) {
+      const brevoApiKey = process.env.BREVO_API_KEY.trim();
+      const brevoPayload = {
+        sender: { name: "GateWay Campus Visitor Portal", email: senderEmail },
+        replyTo: { name: "IIT Ropar GateWay Portal", email: replyToEmail },
+        to: [{ email: visitor.email, name: visitor.name }],
+        subject: emailSubject,
+        htmlContent: emailHtml,
+        textContent: emailText,
+        attachment: [{
+          name: `GateWay-${visitor.id}-QR.png`,
+          content: qrBase64,
+        }],
+      };
+
+      const brevoRes = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "accept": "application/json",
+          "api-key": brevoApiKey,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(brevoPayload),
+      });
+
+      const brevoData = await brevoRes.json();
+      if (!brevoRes.ok) {
+        throw new Error(brevoData.message || `Brevo API HTTP ${brevoRes.status}`);
+      }
+
+      visitor.emailDeliveryStatus = "sent";
+      visitor.emailSentAt = new Date();
+      visitor.emailError = "";
+      await visitor.save();
+      await writeEmailAuditSafely(req, { action: "VISITOR_PASS_EMAIL_SENT", visitor, message: `Approved QR visitor pass emailed to ${visitor.email} via Brevo HTTPS.` });
+      return { status: "sent", message: `Pass email sent to ${visitor.email}.` };
+    }
+
+    // 2. Fallback to direct Nodemailer SMTP (works on localhost)
     const transporter = createTransport();
 
     await transporter.sendMail({
       from,
       to: visitor.email,
-      subject: `Approved Campus Visitor Pass — ${visitor.id}`,
-      text: `Hello ${visitor.name},\n\nYour visitor pass has been approved.\nPass ID: ${visitor.id}\nHost: ${visitor.hostName}\nPurpose: ${visitor.purpose}\nVisit dates: ${visitor.arrivalDate} to ${visitor.exitDate}\nTotal Headcount: ${headcountText}\n\nPresent the attached QR code at the campus gate. Carry the original identity document and follow campus security instructions. This pass is valid only for the approved dates and may be refused if revoked or blacklisted.`,
-      html: `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#0f172a;line-height:1.55"><div style="max-width:620px;margin:auto;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden"><div style="background:#075985;color:#fff;padding:22px 26px"><h1 style="margin:0;font-size:22px">GateWay Campus Visitor Pass</h1><p style="margin:6px 0 0">Visitor pre-approval confirmation</p></div><div style="padding:24px 26px"><p>Hello ${passName},</p><p>Your campus visitor pass has been <strong style="color:#047857">approved</strong>.</p><table style="width:100%;border-collapse:collapse"><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Pass ID</td><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>${passId}</strong></td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Host</td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${hostName}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Purpose</td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${purpose}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Visit dates</td><td style="padding:8px;border-bottom:1px solid #e2e8f0">${arrivalDate} to ${exitDate}</td></tr><tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;color:#64748b">Headcount</td><td style="padding:8px;border-bottom:1px solid #e2e8f0"><strong>${escapeHtml(headcountText)}</strong></td></tr></table><div style="text-align:center;margin:24px 0"><img src="cid:gateway-pass-qr" alt="Visitor pass QR code" width="220" height="220" style="display:inline-block"/><p style="font-size:12px;color:#64748b">Present this QR code at the gate.</p></div><div style="background:#f8fafc;border-radius:10px;padding:14px;font-size:13px"><strong>Important instructions</strong><ul><li>Carry the original identity document submitted with your request.</li><li>Pass is valid only during the approved visit dates.</li><li>Gate entry is subject to final security verification.</li></ul></div><p style="font-size:12px;color:#64748b;margin-top:22px">This message was generated automatically by GateWay. Do not reply to this email.</p></div></div></body></html>`,
+      subject: emailSubject,
+      text: emailText,
+      html: emailHtml,
       attachments: [{ filename: `GateWay-${visitor.id}-QR.png`, content: qrBuffer, contentType: "image/png", cid: "gateway-pass-qr" }],
     });
 
@@ -107,11 +153,11 @@ export async function sendApprovedPassEmail(req, visitor) {
     await writeEmailAuditSafely(req, { action: "VISITOR_PASS_EMAIL_SENT", visitor, message: `Approved QR visitor pass emailed to ${visitor.email}.` });
     return { status: "sent", message: `Pass email sent to ${visitor.email}.` };
   } catch (error) {
-    console.error("GateWay pass email delivery failed:", error.code || "SMTP_ERROR", error.message);
+    console.error("GateWay pass email delivery failed:", error.code || "EMAIL_ERROR", error.message);
     visitor.emailDeliveryStatus = "failed";
-    visitor.emailError = String(error.code || error.message || "SMTP delivery failed").slice(0, 500);
+    visitor.emailError = String(error.code || error.message || "Email delivery failed").slice(0, 500);
     await visitor.save();
-    await writeEmailAuditSafely(req, { action: "VISITOR_PASS_EMAIL_FAILED", visitor, message: "QR visitor pass email delivery failed.", metadata: { errorCode: error.code || "SMTP_ERROR" } });
-    return { status: "failed", message: `Pass was approved, but email delivery failed (${visitor.emailError}). Check server SMTP settings.` };
+    await writeEmailAuditSafely(req, { action: "VISITOR_PASS_EMAIL_FAILED", visitor, message: "QR visitor pass email delivery failed.", metadata: { errorCode: error.code || "EMAIL_ERROR" } });
+    return { status: "failed", message: `Pass was approved, but email delivery failed (${visitor.emailError}).` };
   }
 }
