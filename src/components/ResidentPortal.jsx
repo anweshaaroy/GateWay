@@ -10,6 +10,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
   const [idType, setIdType] = useState("Aadhaar Card");
   const [idNumber, setIdNumber] = useState("");
   const [visitorFile, setVisitorFile] = useState(null);
+  const [accompanyingCount, setAccompanyingCount] = useState(0);
 
   // Normalize role check (case-insensitive)
   const isStudent = activeUser?.role?.toLowerCase() === "student";
@@ -19,9 +20,10 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
       ? `Student ${activeUser?.entryNumber || activeUser?.email?.split("@")[0] || "Resident"}`
       : `Prof. ${activeUser?.email?.split("@")[0] || "Faculty"}`
   );
-  const [hostAddress, setHostAddress] = useState(
-    isStudent ? "Campus Student Hostel" : "Faculty Residential Enclave"
+  const [selectedHostel, setSelectedHostel] = useState(
+    isStudent ? "Satluj (Boys Hostel)" : "Faculty Residential Enclave"
   );
+  const [roomNumber, setRoomNumber] = useState("");
   const [hostIdDocType, setHostIdDocType] = useState(
     isStudent ? "Student College ID Card" : "Faculty Official ID"
   );
@@ -97,12 +99,17 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
       idType === "Aadhaar Card" ? "[Aadhaar Redacted]" : idNumber.trim().toUpperCase()
     );
     formData.append("hostName", hostName.trim());
-    formData.append("hostAddress", hostAddress.trim());
+    const finalHostAddress = roomNumber.trim()
+      ? `${selectedHostel}, Room ${roomNumber.trim()}`
+      : selectedHostel;
+    formData.append("hostAddress", finalHostAddress);
     formData.append("hostIdDocType", hostIdDocType);
     formData.append("arrivalDate", arrivalDate);
     formData.append("exitDate", exitDate);
     formData.append("purpose", purpose);
 
+    formData.append("accompanyingCount", accompanyingCount);
+    formData.append("totalVisitors", 1 + Number(accompanyingCount));
     if (visitorFile) formData.append("visitorFile", visitorFile);
     if (hostFile) formData.append("hostFile", hostFile);
 
@@ -121,6 +128,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
         setVisitorName("");
         setVisitorEmail("");
         setIdNumber("");
+        setAccompanyingCount(0);
         setVisitorFile(null);
         setHostFile(null);
         alert("Gate pass request successfully submitted to security desk!");
@@ -260,6 +268,32 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                 />
               </div>
             </div>
+
+            {/* Accompanying Members / Headcount */}
+            <div className="bg-sky-50/70 p-3.5 rounded-xl border border-sky-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-800">
+                  Accompanying Family / Group Members
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Visiting with family? Enter how many additional persons are accompanying (excluding lead visitor).
+                </p>
+              </div>
+              <div className="flex items-center space-x-2 shrink-0">
+                <span className="text-xs text-slate-500 font-semibold">+</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="30"
+                  value={accompanyingCount}
+                  onChange={(e) => setAccompanyingCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  className="w-20 text-center text-sm font-bold px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                />
+                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 border border-sky-200">
+                  Total: {1 + Number(accompanyingCount)} {1 + Number(accompanyingCount) === 1 ? "Person" : "Persons"}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Section 2: Host Details */}
@@ -282,15 +316,34 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1">
-                  Host Address / Hostel *
+                  Host Hostel / Campus Address *
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={hostAddress}
-                  onChange={(e) => setHostAddress(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
-                />
+                <div className="space-y-2">
+                  <select
+                    value={selectedHostel}
+                    onChange={(e) => setSelectedHostel(e.target.value)}
+                    className="w-full text-xs font-semibold px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer"
+                  >
+                    <option value="Satluj (Boys Hostel)">Satluj (Boys Hostel)</option>
+                    <option value="Beas (Boys Hostel)">Beas (Boys Hostel)</option>
+                    <option value="Chenab (Boys Hostel)">Chenab (Boys Hostel)</option>
+                    <option value="Brahmaputra South (Boys Hostel)">Brahmaputra South (Boys Hostel)</option>
+                    <option value="Brahmaputra North (Boys Hostel)">Brahmaputra North (Boys Hostel)</option>
+                    <option value="Raavi (Girls Hostel)">Raavi (Girls Hostel)</option>
+                    <option value="T6 (Girls Hostel)">T6 (Girls Hostel)</option>
+                    <option value="Chintpurni (Girls Hostel)">Chintpurni (Girls Hostel)</option>
+                    <option value="Faculty Residential Enclave">Faculty Residential Enclave</option>
+                    <option value="Institute Guest House">Institute Guest House</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    placeholder="Room / Block No. (Optional, e.g. Room 204)"
+                    value={roomNumber}
+                    onChange={(e) => setRoomNumber(e.target.value)}
+                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                  />
+                </div>
               </div>
             </div>
 
@@ -459,6 +512,17 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                 <span className="text-slate-400">Visitor ID:</span>
                 <span className="font-mono text-emerald-400 font-semibold">
                   {activePass.idType}: {activePass.idNumber}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Total Headcount:</span>
+                <span className="font-semibold text-emerald-300 flex items-center space-x-1.5">
+                  <span>{activePass.totalVisitors || (1 + (Number(activePass.accompanyingCount) || 0))} Persons</span>
+                  {(Number(activePass.accompanyingCount) || 0) > 0 && (
+                    <span className="text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded border border-sky-400/30">
+                      👥 1+{activePass.accompanyingCount} Group
+                    </span>
+                  )}
                 </span>
               </div>
               <div className="border-t border-slate-700/60 my-1 pt-1"></div>

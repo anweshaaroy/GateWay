@@ -15,6 +15,8 @@ const visitorSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true, maxlength: 120 },
   email: { type: String, required: true, trim: true, lowercase: true, maxlength: 254 },
   phone: { type: String, trim: true, maxlength: 30, default: "" },
+  accompanyingCount: { type: Number, default: 0, min: 0, max: 100 },
+  totalVisitors: { type: Number, default: 1, min: 1, max: 101 },
   idType: { type: String, enum: ["Aadhaar Card", "Passport"], required: true },
   idNumber: { type: String, required: true, maxlength: 80 },
   idDocName: { type: String, default: "" },

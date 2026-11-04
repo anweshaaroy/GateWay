@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   UserCheck,
@@ -7,6 +7,7 @@ import {
   Download,
   Search,
   Camera,
+  Upload,
   LogIn,
   LogOut,
   Clock,
@@ -31,61 +32,167 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/a
 function CameraScannerModal({ isOpen, onClose, onScanSuccess }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [isInitializing, setIsInitializing] = useState(true);
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState("");
+  const scannerRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
+      } catch (err) {
+        console.debug("QR Stop Cleanup Error:", err);
+      }
+      scannerRef.current = null;
+    }
+  };
+
+  const startScanner = async (cameraIdToUse) => {
+    setErrorMsg("");
+    setIsInitializing(true);
+    await stopScanner();
+
+    try {
+      const { Html5Qrcode } = await import("html5-qrcode");
+      const element = document.getElementById("qr-scanner-box");
+      if (!element) return;
+
+      const html5QrCode = new Html5Qrcode("qr-scanner-box");
+      scannerRef.current = html5QrCode;
+
+      // Query available video input devices
+      let devices = cameras;
+      if (devices.length === 0) {
+        try {
+          devices = await Html5Qrcode.getCameras();
+          if (devices && devices.length > 0) {
+            setCameras(devices);
+          }
+        } catch (camErr) {
+          console.warn("Could not list cameras ahead of time:", camErr);
+        }
+      }
+
+      // Determine camera target
+      let cameraConfig = { facingMode: "environment" };
+      if (cameraIdToUse) {
+        cameraConfig = cameraIdToUse;
+      } else if (devices && devices.length > 0) {
+        const backCam = devices.find((d) => /back|rear|environment/i.test(d.label));
+        const chosen = backCam || devices[0];
+        cameraConfig = chosen.id;
+        setSelectedCameraId(chosen.id);
+      }
+
+      const qrboxConfig = (viewfinderWidth, viewfinderHeight) => {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        const size = Math.max(140, Math.floor(minEdge * 0.72));
+        return { width: size, height: size };
+      };
+
+      try {
+        await html5QrCode.start(
+          cameraConfig,
+          {
+            fps: 10,
+            qrbox: qrboxConfig,
+            aspectRatio: 1.0,
+          },
+          async (decodedText) => {
+            await stopScanner();
+            onScanSuccess(decodedText);
+          },
+          () => {}
+        );
+      } catch (firstErr) {
+        console.warn("Environment camera start failed, trying fallback mode...", firstErr);
+        // Fallback to front camera or default media device
+        await html5QrCode.start(
+          { facingMode: "user" },
+          {
+            fps: 10,
+            qrbox: qrboxConfig,
+            aspectRatio: 1.0,
+          },
+          async (decodedText) => {
+            await stopScanner();
+            onScanSuccess(decodedText);
+          },
+          () => {}
+        );
+      }
+
+      setIsInitializing(false);
+    } catch (err) {
+      console.error("Camera launch error:", err);
+      let msg = "Camera access denied or device not found. Please permit camera access in your browser settings.";
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        msg = "Camera permission was blocked. Tap the lock/info icon in your browser URL bar and allow Camera permission.";
+      } else if (err?.name === "NotFoundError" || err?.name === "OverconstrainedError") {
+        msg = "No suitable camera stream found on this device. You can upload a QR pass image below instead.";
+      }
+      setErrorMsg(msg);
+      setIsInitializing(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
 
-    let html5QrCode = null;
-    setErrorMsg("");
-    setIsInitializing(true);
-
-    const timer = setTimeout(async () => {
-      try {
-        const { Html5Qrcode } = await import("html5-qrcode");
-        html5QrCode = new Html5Qrcode("qr-scanner-box");
-
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 240, height: 240 } },
-          (decodedText) => {
-            html5QrCode
-              .stop()
-              .then(() => onScanSuccess(decodedText))
-              .catch(() => onScanSuccess(decodedText));
-          },
-          () => {}
-        );
-        setIsInitializing(false);
-      } catch (err) {
-        console.error("Camera launch error:", err);
-        setErrorMsg("Camera access denied or device not found. Please permit camera access.");
-        setIsInitializing(false);
-      }
+    const timer = setTimeout(() => {
+      startScanner();
     }, 250);
 
     return () => {
       clearTimeout(timer);
-      if (html5QrCode) {
-        html5QrCode
-          .stop()
-          .then(() => html5QrCode.clear())
-          .catch((e) => console.debug("QR Stop Cleanup:", e));
-      }
+      stopScanner();
     };
-  }, [isOpen, onScanSuccess]);
+  }, [isOpen]);
+
+  const handleCameraChange = (e) => {
+    const newId = e.target.value;
+    setSelectedCameraId(newId);
+    startScanner(newId);
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsInitializing(true);
+      setErrorMsg("");
+      const { Html5Qrcode } = await import("html5-qrcode");
+      const tempScanner = scannerRef.current || new Html5Qrcode("qr-scanner-box");
+      const decodedText = await tempScanner.scanFile(file, true);
+      await stopScanner();
+      onScanSuccess(decodedText);
+    } catch (err) {
+      console.error("File QR scan error:", err);
+      setErrorMsg("No readable QR code found in this image. Please upload a clear photo of the QR passcode.");
+      setIsInitializing(false);
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
+    <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl flex flex-col">
         <div className="p-4 border-b border-slate-800 flex justify-between items-center text-white">
           <div className="flex items-center space-x-2">
             <Camera className="w-5 h-5 text-emerald-400" />
             <span className="font-bold text-sm tracking-wide">Optical Gate Scanner</span>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => {
+              stopScanner();
+              onClose();
+            }}
             className="p-1.5 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -93,13 +200,30 @@ function CameraScannerModal({ isOpen, onClose, onScanSuccess }) {
         </div>
 
         <div className="p-5 flex flex-col items-center">
+          {/* Camera switcher dropdown if multiple cameras detected */}
+          {cameras.length > 1 && (
+            <div className="w-full mb-3">
+              <select
+                value={selectedCameraId}
+                onChange={handleCameraChange}
+                className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 outline-none focus:border-emerald-500"
+              >
+                {cameras.map((c, i) => (
+                  <option key={c.id || i} value={c.id}>
+                    {c.label || `Camera ${i + 1}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {errorMsg ? (
-            <div className="p-6 text-center text-rose-400 text-xs bg-rose-950/30 border border-rose-800/40 rounded-2xl w-full">
-              <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-80" />
+            <div className="p-5 text-center text-rose-300 text-xs bg-rose-950/40 border border-rose-800/50 rounded-2xl w-full mb-3">
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-rose-400" />
               <p className="font-semibold">{errorMsg}</p>
             </div>
           ) : (
-            <div className="w-full bg-black rounded-2xl overflow-hidden border border-slate-800 aspect-square flex items-center justify-center relative">
+            <div className="w-full bg-black rounded-2xl overflow-hidden border border-slate-800 aspect-square flex items-center justify-center relative shadow-inner">
               {isInitializing && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 bg-slate-900/90 z-10">
                   <Loader2 className="w-8 h-8 animate-spin text-emerald-400 mb-2" />
@@ -109,9 +233,30 @@ function CameraScannerModal({ isOpen, onClose, onScanSuccess }) {
               <div id="qr-scanner-box" className="w-full h-full" />
             </div>
           )}
+
           <p className="text-xs text-slate-400 mt-3 text-center">
             Point camera directly at visitor's physical or digital QR passcode.
           </p>
+
+          {/* Backup Option: Upload Pass Image */}
+          <div className="mt-4 pt-3 border-t border-slate-800 w-full flex items-center justify-between">
+            <span className="text-xs text-slate-400">Can't use camera?</span>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload QR Image</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -129,6 +274,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
   const [idType, setIdType] = useState("Aadhaar Card");
   const [idDocName, setIdDocName] = useState("");
+  const [accompanyingCount, setAccompanyingCount] = useState(0);
   const [generatedPass, setGeneratedPass] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -141,6 +287,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
       setPurpose("Personal / Guest");
       setGeneratedPass(null);
       setIdDocName("");
+      setAccompanyingCount(0);
     }
   }, [isOpen]);
 
@@ -487,7 +634,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   );
 }
 
-export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisitor }) {
+export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisitor, onRefresh }) {
   const [query, setQuery] = useState("");
   const [isCamOpen, setIsCamOpen] = useState(false);
   const [isSpotModalOpen, setIsSpotModalOpen] = useState(false);
@@ -607,35 +754,116 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
     document.body.removeChild(link);
   };
 
-  const handleScanSuccess = (decodedText) => {
+  const handleScanSuccess = async (decodedText) => {
     setIsCamOpen(false);
-    const textClean = decodedText.trim().toLowerCase();
-    const matched = visitors.find(
-      (v) =>
-        v?.passcode?.toLowerCase() === textClean ||
-        v?.id?.toString().toLowerCase() === textClean
-    );
+    if (!decodedText) return;
+
+    let cleanCode = String(decodedText).trim();
+    // If URL was scanned, extract token or passcode
+    if (cleanCode.includes("/")) {
+      const parts = cleanCode.split("/").filter(Boolean);
+      cleanCode = parts[parts.length - 1] || cleanCode;
+    }
+    if (cleanCode.includes("?")) {
+      const parts = cleanCode.split("?");
+      cleanCode = parts[0] || cleanCode;
+    }
+
+    // Handle possible JSON formatted QR payload
+    let candidates = [cleanCode, cleanCode.toLowerCase()];
+    try {
+      const parsed = JSON.parse(decodedText);
+      if (parsed && typeof parsed === "object") {
+        if (parsed.passcode) candidates.push(String(parsed.passcode).trim(), String(parsed.passcode).trim().toLowerCase());
+        if (parsed.qrToken) candidates.push(String(parsed.qrToken).trim(), String(parsed.qrToken).trim().toLowerCase());
+        if (parsed.id) candidates.push(String(parsed.id).trim(), String(parsed.id).trim().toLowerCase());
+        if (parsed._id) candidates.push(String(parsed._id).trim(), String(parsed._id).trim().toLowerCase());
+      }
+    } catch {
+      // Normal plain-text code
+    }
+
+    // 1. First: Query backend real-time verification endpoint
+    try {
+      const token =
+        localStorage.getItem("gateway_token") ||
+        localStorage.getItem("token") ||
+        localStorage.getItem("authToken") ||
+        "";
+
+      const res = await fetch(`${BACKEND_URL}/guard/verify/${encodeURIComponent(cleanCode)}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.visitor) {
+          const v = data.visitor;
+          const targetId = v.id || v._id;
+
+          if (!data.eligible) {
+            alert(`⛔ Access Denied: ${data.reason || "Pass is not eligible for entry/exit."}\n\nVisitor: ${v.name}\nPass ID: ${v.id || v.passcode}\nClearance: ${v.approvalStatus}\nCurrent Status: ${v.status}`);
+            return;
+          }
+
+          if (data.action === "CHECK_IN" || v.status !== "Inside Campus") {
+            await handleUpdateGateStatus(targetId, "Inside Campus");
+            const headCount = v.totalVisitors || (1 + (Number(v.accompanyingCount) || 0));
+            alert(`✅ VERIFIED - CHECK-IN RECORDED\n\nVisitor: ${v.name}\n👥 Total Headcount: ${headCount} Persons (${headCount > 1 ? `1 Lead + ${v.accompanyingCount || headCount - 1} Accompanying` : "Solo"})\nPass ID: ${v.id}\nPasscode: ${v.passcode}\nStatus: Inside Campus`);
+          } else {
+            await handleUpdateGateStatus(targetId, "Completed");
+            alert(`✅ VERIFIED - CHECK-OUT RECORDED\n\nVisitor: ${v.name}\nPass ID: ${v.id}\nPasscode: ${v.passcode}\nStatus: Completed`);
+          }
+
+          if (onRefresh) onRefresh();
+          return;
+        }
+      }
+    } catch (apiErr) {
+      console.warn("Backend real-time verify check failed, evaluating local visitor records:", apiErr);
+    }
+
+    // 2. Fallback: Search in local records across passcode, qrToken, id, and _id
+    const matched = visitors.find((v) => {
+      const pCode = v?.passcode ? String(v.passcode).trim().toLowerCase() : "";
+      const qToken = v?.qrToken ? String(v.qrToken).trim().toLowerCase() : "";
+      const vId = v?.id ? String(v.id).trim().toLowerCase() : "";
+      const mId = v?._id ? String(v._id).trim().toLowerCase() : "";
+
+      return candidates.some((c) => {
+        const cLow = String(c).trim().toLowerCase();
+        return cLow && (cLow === pCode || cLow === qToken || cLow === vId || cLow === mId);
+      });
+    });
 
     if (!matched) {
-      alert(`Access Rejected: Passcode "${decodedText}" not found in current logs!`);
+      alert(`Access Rejected: Scanned code "${cleanCode}" not found in visitor records.\n\nIf this pass was recently created or approved, please click "Refresh" at the top of the terminal and try again.`);
       return;
     }
+
+    const visitorId = matched.id || matched._id;
+
     if (matched.blacklisted) {
-      alert(`🚨 SECURITY ALERT: ${matched.name} (${matched.passcode}) is BLACKLISTED! Entry denied.`);
+      alert(`🚨 SECURITY ALERT: ${matched.name} (${matched.passcode || matched.id}) is BLACKLISTED! Entry denied.`);
       return;
     }
     if (matched.approvalStatus !== "Approved") {
-      alert(`Entry Denied: Clearance status is currently "${matched.approvalStatus}".`);
+      alert(`Entry Denied: Clearance status is currently "${matched.approvalStatus}". Approved clearance is required.`);
       return;
     }
 
     if (matched.status !== "Inside Campus") {
-      handleUpdateGateStatus(matched.id, "Inside Campus");
-      alert(`Verified: ${matched.name} (${matched.passcode}) Check-IN recorded successfully!`);
+      await handleUpdateGateStatus(visitorId, "Inside Campus");
+      const headCount = matched.totalVisitors || (1 + (Number(matched.accompanyingCount) || 0));
+      alert(`✅ VERIFIED - CHECK-IN RECORDED\n\nVisitor: ${matched.name}\n👥 Total Headcount: ${headCount} Persons (${headCount > 1 ? `1 Lead + ${matched.accompanyingCount || headCount - 1} Accompanying` : "Solo"})\nPasscode: ${matched.passcode}\nStatus: Inside Campus`);
     } else {
-      handleUpdateGateStatus(matched.id, "Completed");
-      alert(`Verified: ${matched.name} (${matched.passcode}) Check-OUT recorded successfully!`);
+      await handleUpdateGateStatus(visitorId, "Completed");
+      alert(`✅ VERIFIED - CHECK-OUT RECORDED\n\nVisitor: ${matched.name}\nPasscode: ${matched.passcode}\nStatus: Completed`);
     }
+
+    if (onRefresh) onRefresh();
   };
 
   return (
@@ -766,7 +994,14 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
                         )}
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className="font-bold text-slate-800">{item.name}</span>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-bold text-slate-800">{item.name}</span>
+                          {(item.totalVisitors > 1 || (Number(item.accompanyingCount) || 0) > 0) && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200" title={`1 Lead + ${item.accompanyingCount || item.totalVisitors - 1} Accompanying`}>
+                              👥 {item.totalVisitors || (1 + (Number(item.accompanyingCount) || 0))}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-slate-500 truncate max-w-[140px]">{item.email}</div>
                       </td>
                       <td className="py-3.5 px-4 text-xs">

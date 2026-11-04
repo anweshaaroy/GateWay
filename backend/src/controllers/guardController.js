@@ -27,7 +27,12 @@ export const verifyPass = asyncHandler(async (req, res) => {
 });
 
 export const changeGateStatus = asyncHandler(async (req, res) => {
-  const visitor = await Visitor.findOne({ id: req.params.visitorId });
+  const vid = String(req.params.visitorId || "").trim();
+  const query = [{ id: vid }];
+  if (/^[0-9a-fA-F]{24}$/.test(vid)) {
+    query.push({ _id: vid });
+  }
+  const visitor = await Visitor.findOne({ $or: query });
   if (!visitor) throw httpError(404, "Visitor request not found.");
   const targetStatus = String(req.body?.status || "").trim();
   const eligibility = eligibilityForNextAction(visitor);
@@ -68,10 +73,13 @@ export const createSpotPass = asyncHandler(async (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(arrivalDate) || !/^\d{4}-\d{2}-\d{2}$/.test(exitDate) || exitDate < arrivalDate) throw httpError(400, "Enter valid visit dates; departure cannot be before arrival.");
   if (emailInput && !/^\S+@\S+\.\S+$/.test(emailInput)) throw httpError(400, "Enter a valid visitor email or leave it blank.");
   const durationDays = Math.round((new Date(`${exitDate}T00:00:00Z`) - new Date(`${arrivalDate}T00:00:00Z`)) / 86400000) + 1;
+  const accompanyingCount = Math.max(0, Math.min(100, parseInt(body.accompanyingCount, 10) || 0));
+  const totalVisitors = 1 + accompanyingCount;
   const email = emailInput || `walkin-${phone.replace(/\D/g, "").slice(-12)}@invalid.local`;
   const visitor = await Visitor.create({
     id: await createUniqueVisitorId(), passcode: await createUniquePasscode(), qrToken: createQrToken(), requester: req.user._id,
     name, email, phone, idType, idNumber: "[Walk-in ID verified by guard]", idDocName: String(body.idDocName || "").slice(0, 160), idDocUrl: null,
+    accompanyingCount, totalVisitors,
     hostName, hostEmail: req.user.email, hostAddress: "Campus Main Facility", hostIdDocType: "Instant Guard Permit", hostDocName: "", hostDocUrl: null,
     purpose, arrivalDate, exitDate, durationDays, approvalStatus: "Approved", status: "Pending", requestTimestamp: timeLabel(), blacklisted: false,
     emailDeliveryStatus: "not_sent", visitHistory: [{ action: "WALK_IN_PASS_CREATED", actor: req.user._id, notes: "Walk-in pass issued by gate security." }],

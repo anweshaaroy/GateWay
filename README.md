@@ -92,6 +92,7 @@ Manual gate registers in large university campuses and residential institutions 
 - **Hardware Optical Scanning:** Mounts a high-frame camera stream via `html5-qrcode` to decode visitor QR matrices directly.
 - **Multi-Vector Directory Search:** Enables rapid filtering across 4-digit passcodes, visitor names, host apartments, and email addresses.
 - **Overstay Sentinel:** Detects visitors who exceed allowed visit durations while remaining inside the premises.
+- **E-Pass & Spot Pass** Approved QR pass emailed over SMTP; guards can issue walk-in passes.
 - **CSV Data Log:** Instant local export of time-stamped perimeter log data for security archives.
 - **E-Pass & Spot Pass** Approved QR pass emailed over SMTP; guards can issue walk-in passes.
 
@@ -156,7 +157,7 @@ npm install
 ```bash
 npm run dev
 ```
-Open your browser and navigate to `http://localhost:5173`.
+Open your browser and navigate to `http://localhost:5174`.
 
 ---
 
