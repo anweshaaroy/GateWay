@@ -95,6 +95,9 @@ export default function AdminDesk({
       if (data.success) {
         if (onApprove) onApprove(id);
         fetchPasses();
+        if (data.email && data.email.status === "failed") {
+          alert(`Pass Approved! ⚠️ Email notice: ${data.email.message || data.message}`);
+        }
       } else {
         alert("Approval failed: " + data.message);
       }
