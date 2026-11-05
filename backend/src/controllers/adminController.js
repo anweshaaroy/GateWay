@@ -3,10 +3,10 @@ import AuditLog from "../models/AuditLog.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { httpError } from "../utils/httpError.js";
 import { writeAudit } from "../utils/audit.js";
-import { sendApprovedPassEmail } from "../services/passEmail.js";
+import { sendApprovedPassEmail, sendRejectedPassEmail } from "../services/passEmail.js";
 
 async function getRequestOr404(id) {
-  const visitor = await Visitor.findOne({ id });
+  const visitor = await Visitor.findOne({ id }).populate("requester", "name email role entryNumber");
   if (!visitor) throw httpError(404, "Visitor request not found.");
   return visitor;
 }
@@ -54,7 +54,9 @@ export const rejectVisitorRequest = asyncHandler(async (req, res) => {
   visitor.visitHistory.push({ action: "REJECTED", actor: req.user._id, notes: reason });
   await visitor.save();
   await writeAudit(req, { action: "VISITOR_REQUEST_REJECTED", visitor, message: `Visitor request ${visitor.id} rejected.`, metadata: { reason } });
-  res.json({ success: true, message: "Visitor request rejected.", visitor, pass: visitor });
+  // Rejection email notification sent to both Host and Visitor
+  const email = await sendRejectedPassEmail(req, visitor, reason);
+  res.json({ success: true, message: "Visitor request rejected and notification emailed.", visitor, pass: visitor, email });
 });
 
 export const toggleBlacklist = asyncHandler(async (req, res) => {

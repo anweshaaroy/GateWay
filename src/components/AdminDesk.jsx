@@ -22,6 +22,15 @@ import {
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
 
+const REJECTION_REASONS = [
+  "Uploaded ID proof is blurry or unreadable",
+  "Visitor details do not match the attached identity proof",
+  "Host residence or room number could not be verified",
+  "Visit dates or requested duration are invalid",
+  "Duplicate visitor pass request",
+  "Entry restricted as per campus security policy",
+];
+
 export default function AdminDesk({
   visitors: externalVisitors = [],
   onApprove,
@@ -35,6 +44,9 @@ export default function AdminDesk({
   const [activeDoc, setActiveDoc] = useState(null);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [rejectModalPass, setRejectModalPass] = useState(null);
+  const [selectedRejectReason, setSelectedRejectReason] = useState(REJECTION_REASONS[0]);
+  const [isRejecting, setIsRejecting] = useState(false);
 
   // Helper method to resolve available authentication token
   const getAuthToken = () => {
@@ -108,18 +120,22 @@ export default function AdminDesk({
   };
 
   // Synchronize visitor rejection with backend
-  const handleRejectPass = async (id) => {
+  const handleRejectPass = async (id, reason) => {
     const token = getAuthToken();
+    setIsRejecting(true);
     try {
       const res = await fetch(`${BACKEND_URL}/admin/reject/${id}`, {
         method: "PATCH",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
+        body: JSON.stringify({ reason: reason || selectedRejectReason }),
       });
       const data = await res.json();
       if (data.success) {
         if (onReject) onReject(id);
+        setRejectModalPass(null);
         fetchPasses();
       } else {
         alert("Reject failed: " + data.message);
@@ -127,6 +143,9 @@ export default function AdminDesk({
     } catch (err) {
       console.error("Reject API Error:", err);
       if (onReject) onReject(id);
+      setRejectModalPass(null);
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -449,7 +468,10 @@ export default function AdminDesk({
                           <span>Approve</span>
                         </button>
                         <button
-                          onClick={() => handleRejectPass(vid)}
+                          onClick={() => {
+                            setSelectedRejectReason(REJECTION_REASONS[0]);
+                            setRejectModalPass(v);
+                          }}
                           className="bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg transition flex items-center space-x-1 shadow-sm cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
@@ -728,6 +750,127 @@ export default function AdminDesk({
                   Dismiss Viewer
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Official Rejection Reason Modal */}
+      {rejectModalPass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="px-6 py-4 bg-rose-900 text-white flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-rose-800 flex items-center justify-center text-rose-200">
+                  <ShieldAlert className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight">Reject Visitor Request</h3>
+                  <p className="text-[11px] text-rose-200">
+                    Pass ID: <span className="font-mono font-semibold">{rejectModalPass.id || rejectModalPass._id}</span> &bull; {rejectModalPass.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isRejecting}
+                onClick={() => setRejectModalPass(null)}
+                className="text-rose-200 hover:text-white p-1 rounded-lg hover:bg-rose-800/60 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-800 font-bold mb-1 text-xs">
+                  Select Rejection Reason:
+                </label>
+                <p className="text-[11px] text-slate-500 mb-3">
+                  Select the campus clearance violation. An official notice will be emailed to both the Host and Visitor.
+                </p>
+
+                <div className="space-y-2">
+                  {REJECTION_REASONS.map((reason, idx) => {
+                    const isSelected = selectedRejectReason === reason;
+                    return (
+                      <label
+                        key={idx}
+                        onClick={() => setSelectedRejectReason(reason)}
+                        className={`flex items-start space-x-3 p-3 rounded-xl border text-xs cursor-pointer transition ${
+                          isSelected
+                            ? "border-rose-500 bg-rose-50/80 text-rose-950 shadow-xs"
+                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="rejectionReason"
+                          value={reason}
+                          checked={isSelected}
+                          onChange={() => setSelectedRejectReason(reason)}
+                          className="mt-0.5 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                        />
+                        <span className={`leading-relaxed ${isSelected ? "font-semibold" : ""}`}>
+                          {reason}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Recipients Summary */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 space-y-1">
+                <div className="font-semibold text-slate-700 text-xs mb-1">Email Delivery Notification:</div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Visitor:</span>
+                  <span className="font-mono text-slate-700 truncate max-w-[260px]">{rejectModalPass.email || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Host Resident:</span>
+                  <span className="font-mono text-slate-700 truncate max-w-[260px]">
+                    {rejectModalPass.hostEmail || rejectModalPass.requester?.email || "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end space-x-2.5">
+              <button
+                type="button"
+                disabled={isRejecting}
+                onClick={() => setRejectModalPass(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-semibold text-xs transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isRejecting}
+                onClick={() =>
+                  handleRejectPass(
+                    rejectModalPass.id || rejectModalPass._id,
+                    selectedRejectReason
+                  )
+                }
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs transition shadow-xs flex items-center space-x-1.5 cursor-pointer disabled:opacity-60"
+              >
+                {isRejecting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Sending Notification...</span>
+                  </>
+                ) : (
+                  <>
+                    <X className="w-3.5 h-3.5" />
+                    <span>Confirm Rejection &amp; Send Mail</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

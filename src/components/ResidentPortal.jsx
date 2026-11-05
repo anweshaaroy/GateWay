@@ -551,14 +551,25 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
               </div>
             </div>
 
-            {activePass.approvalStatus !== "Approved" && (
+            {activePass.approvalStatus === "Rejected" ? (
+              <div className="mt-3 p-3 bg-rose-500/15 border border-rose-500/30 rounded-xl text-left space-y-1">
+                <div className="flex items-center space-x-1.5 text-xs font-bold text-rose-300">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>Pass Request Rejected</span>
+                </div>
+                <p className="text-[11px] text-rose-200 pl-5 leading-relaxed">
+                  <span className="font-semibold text-rose-300">Reason: </span>
+                  {activePass.rejectionReason || "Entry restricted as per campus security policy."}
+                </p>
+              </div>
+            ) : activePass.approvalStatus !== "Approved" ? (
               <div className="mt-3 p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center space-x-2 text-[11px] text-amber-300 text-left">
                 <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
                 <span>
                   Requires clearance from the Security Admin Desk before QR pass can be issued or emailed.
                 </span>
               </div>
-            )}
+            ) : null}
 
             <div className="flex items-center space-x-2 mt-4">
               <button
@@ -572,12 +583,18 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                 title={
                   activePass.approvalStatus === "Approved"
                     ? "Send pass by email"
+                    : activePass.approvalStatus === "Rejected"
+                    ? "Pass request was rejected by Security Admin"
                     : "Pass must be approved by Security Admin before it can be sent"
                 }
               >
                 <MailCheck className="w-3.5 h-3.5" />
                 <span>
-                  {activePass.approvalStatus === "Approved" ? "Send e-Pass" : "Awaiting Admin Clearance"}
+                  {activePass.approvalStatus === "Approved"
+                    ? "Send e-Pass"
+                    : activePass.approvalStatus === "Rejected"
+                    ? "Request Rejected"
+                    : "Awaiting Admin Clearance"}
                 </span>
               </button>
               <button
