@@ -18,10 +18,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const allowedOrigins = String(process.env.CLIENT_URL || "http://localhost:5173")
+const defaultOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://gateway-iitrpr.anwesharoy0177.workers.dev"
+];
+const envOrigins = String(process.env.CLIENT_URL || "")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
 app.disable("x-powered-by");
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
