@@ -155,29 +155,53 @@ export default function AdminDesk({
     }
   };
 
-  const handleDownloadProof = (e, fileUrl, fileName, holderName, docType) => {
+  // Helper to ensure document URLs point to the backend server rather than the SPA frontend
+  const resolveDocUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) {
+      return url;
+    }
+    const backendBase = BACKEND_URL.replace(/\/api\/?$/, "");
+    return `${backendBase}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
+  const handleDownloadProof = async (e, fileUrl, fileName, holderName, docType) => {
     e.stopPropagation();
     if (!fileUrl) return;
 
-    const safeFileName =
-      fileName ||
-      `${holderName ? holderName.replace(/\s+/g, "_") : "ID"}_${docType || "Proof"}.jpg`;
+    const fullUrl = resolveDocUrl(fileUrl);
+    const token = getAuthToken();
 
-    const link = document.createElement("a");
-    link.href = fileUrl;
-    link.download = safeFileName;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const res = await fetch(fullUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Could not download file");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const safeFileName =
+        fileName ||
+        `${holderName ? holderName.replace(/\s+/g, "_") : "ID"}_${docType || "Proof"}.jpg`;
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = safeFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(fullUrl, "_blank");
+    }
   };
 
   const handleOpenDoc = (docType, docName, holderName, docUrl) => {
+    const fullUrl = resolveDocUrl(docUrl);
     if (onOpenDocModal) {
-      onOpenDocModal(docType, docName, holderName, docUrl);
+      onOpenDocModal(docType, docName, holderName, fullUrl);
     } else {
-      setActiveDoc({ docType, docName, holderName, docUrl });
+      setActiveDoc({ docType, docName, holderName, docUrl: fullUrl });
       setScale(1);
       setRotation(0);
     }

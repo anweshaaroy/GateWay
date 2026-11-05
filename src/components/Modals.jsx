@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   FileText,
   FileCheck2,
@@ -9,16 +9,23 @@ import {
   RotateCw,
   RefreshCcw,
   X,
+  Loader2,
+  Download,
+  ExternalLink,
+  AlertCircle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
 
 export function LargeDocModal({ isOpen, onClose, docData }) {
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  if (!isOpen || !docData) return null;
-
-  const ext = docData.fileName?.split(".").pop().toLowerCase();
+  const ext = docData?.fileName?.split(".").pop().toLowerCase();
   const isImage = ["jpg", "jpeg", "png", "webp"].includes(ext);
   const isPdf = ext === "pdf";
 
@@ -34,6 +41,79 @@ export function LargeDocModal({ isOpen, onClose, docData }) {
     handleResetControls();
     onClose();
   };
+
+  // Securely resolve and fetch remote document binary
+  useEffect(() => {
+    if (!isOpen || !docData?.fileUrl) {
+      setBlobUrl(null);
+      setErrorMsg("");
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+    let createdBlob = null;
+
+    const loadDocument = async () => {
+      setLoading(true);
+      setErrorMsg("");
+
+      let targetUrl = docData.fileUrl;
+      // Resolve relative path to full backend server address
+      if (targetUrl.startsWith("/")) {
+        const backendBase = BACKEND_URL.replace(/\/api\/?$/, "");
+        targetUrl = `${backendBase}${targetUrl}`;
+      }
+
+      // If already a local blob/data URL, render immediately
+      if (targetUrl.startsWith("blob:") || targetUrl.startsWith("data:")) {
+        setBlobUrl(targetUrl);
+        setLoading(false);
+        return;
+      }
+
+      const token =
+        localStorage.getItem("token") ||
+        localStorage.getItem("authToken");
+
+      try {
+        const res = await fetch(targetUrl, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}: ${res.statusText}`);
+        }
+
+        const blob = await res.blob();
+        if (!active) return;
+
+        createdBlob = URL.createObjectURL(blob);
+        setBlobUrl(createdBlob);
+      } catch (err) {
+        if (!active) return;
+        console.error("Document fetch error:", err);
+        setErrorMsg(err.message || "Could not load document preview.");
+        // Fallback to target URL
+        setBlobUrl(targetUrl);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadDocument();
+
+    return () => {
+      active = false;
+      if (createdBlob) {
+        URL.revokeObjectURL(createdBlob);
+      }
+    };
+  }, [isOpen, docData?.fileUrl]);
+
+  if (!isOpen || !docData) return null;
+
+  const currentPreviewUrl = blobUrl || docData.fileUrl;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6">
@@ -54,9 +134,9 @@ export function LargeDocModal({ isOpen, onClose, docData }) {
             </div>
           </div>
 
-          {/* Interactive Inspection Controls for Images */}
+          {/* Interactive Inspection Controls */}
           <div className="flex items-center space-x-1.5">
-            {isImage && docData.fileUrl && (
+            {isImage && currentPreviewUrl && !loading && !errorMsg && (
               <div className="flex items-center space-x-1 bg-slate-800 p-1 rounded-xl border border-slate-700 mr-2">
                 <button
                   onClick={handleZoomIn}
@@ -88,6 +168,21 @@ export function LargeDocModal({ isOpen, onClose, docData }) {
                 </button>
               </div>
             )}
+
+            {currentPreviewUrl && (
+              <a
+                href={currentPreviewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                download={docData.fileName || "document"}
+                className="p-1.5 bg-slate-800 hover:bg-sky-600 text-slate-300 hover:text-white rounded-xl border border-slate-700 transition flex items-center space-x-1 text-xs px-2.5 mr-2 cursor-pointer"
+                title="Download or Open Fullscreen"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Open Full</span>
+              </a>
+            )}
+
             <button
               onClick={handleModalClose}
               className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white transition flex items-center justify-center cursor-pointer"
@@ -117,12 +212,35 @@ export function LargeDocModal({ isOpen, onClose, docData }) {
         </div>
 
         {/* Live Document Canvas */}
-        <div className="p-6 overflow-hidden flex-1 bg-slate-100 flex items-center justify-center min-h-[420px] relative select-none">
-          {docData.fileUrl ? (
+        <div className="p-6 overflow-hidden flex-1 bg-slate-100 flex items-center justify-center min-h-[440px] relative select-none">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center space-y-3 p-8 text-center">
+              <Loader2 className="w-9 h-9 text-sky-600 animate-spin" />
+              <p className="text-sm font-semibold text-slate-700">Loading document securely from server...</p>
+              <p className="text-xs text-slate-400">Verifying security clearance credentials</p>
+            </div>
+          ) : errorMsg && !blobUrl ? (
+            <div className="bg-white rounded-2xl border border-rose-200 p-8 text-center space-y-3 max-w-md shadow-sm">
+              <AlertCircle className="w-10 h-10 text-rose-500 mx-auto" />
+              <h4 className="font-bold text-sm text-slate-800">Could not preview document inline</h4>
+              <p className="text-xs text-slate-500 leading-relaxed">{errorMsg}</p>
+              {currentPreviewUrl && (
+                <a
+                  href={currentPreviewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center space-x-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-xl shadow-sm transition"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Document in New Tab</span>
+                </a>
+              )}
+            </div>
+          ) : currentPreviewUrl ? (
             isImage ? (
               <div className="overflow-hidden flex items-center justify-center w-full h-full">
                 <img
-                  src={docData.fileUrl}
+                  src={currentPreviewUrl}
                   alt="Document Verification"
                   className="max-h-[500px] w-auto max-w-full rounded-xl object-contain shadow-md border border-slate-300 bg-white transition-transform duration-200"
                   style={{
@@ -132,18 +250,22 @@ export function LargeDocModal({ isOpen, onClose, docData }) {
               </div>
             ) : isPdf ? (
               <iframe
-                src={docData.fileUrl}
+                src={currentPreviewUrl}
                 title="PDF Verification"
                 className="w-full h-[540px] rounded-xl border border-slate-300 shadow-sm bg-white"
               />
-            ) : null
+            ) : (
+              <iframe
+                src={currentPreviewUrl}
+                title="Document Verification"
+                className="w-full h-[540px] rounded-xl border border-slate-300 shadow-sm bg-white"
+              />
+            )
           ) : (
             <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center space-y-3">
               <FileCheck2 className="w-12 h-12 text-slate-400 mx-auto" />
               <p className="text-sm font-semibold text-slate-700">
                 Sample Mock Entry (No Live File Attached)
-              </p>
-              <p className="text-xs text-slate-400">
               </p>
             </div>
           )}
@@ -156,7 +278,7 @@ export function LargeDocModal({ isOpen, onClose, docData }) {
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               <span>Digital Security Verification Active</span>
             </span>
-            {isImage && docData.fileUrl && (
+            {isImage && currentPreviewUrl && !loading && (
               <span className="text-[11px] font-mono text-slate-400">
                 Scale: {Math.round(scale * 100)}% | Rotation: {rotation}&deg;
               </span>
