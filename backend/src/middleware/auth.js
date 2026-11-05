@@ -5,8 +5,9 @@ import { httpError } from "../utils/httpError.js";
 
 export const protect = asyncHandler(async (req, _res, next) => {
   const header = req.get("authorization") || "";
-  const [scheme, token] = header.split(" ");
-  if (scheme !== "Bearer" || !token) throw httpError(401, "Sign in with Google to access this resource.");
+  const [scheme, tokenFromHeader] = header.split(" ");
+  const token = (scheme === "Bearer" && tokenFromHeader) || req.query.token;
+  if (!token) throw httpError(401, "Sign in with Google to access this resource.");
   let payload;
   try {
     payload = jwt.verify(token, process.env.JWT_SECRET);

@@ -95,6 +95,9 @@ export default function AdminDesk({
       if (data.success) {
         if (onApprove) onApprove(id);
         fetchPasses();
+        if (data.email && data.email.status === "failed") {
+          alert(`Pass Approved! ⚠️ Email notice: ${data.email.message || data.message}`);
+        }
       } else {
         alert("Approval failed: " + data.message);
       }
@@ -152,29 +155,53 @@ export default function AdminDesk({
     }
   };
 
-  const handleDownloadProof = (e, fileUrl, fileName, holderName, docType) => {
+  // Helper to ensure document URLs point to the backend server rather than the SPA frontend
+  const resolveDocUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:") || url.startsWith("data:")) {
+      return url;
+    }
+    const backendBase = BACKEND_URL.replace(/\/api\/?$/, "");
+    return `${backendBase}${url.startsWith("/") ? "" : "/"}${url}`;
+  };
+
+  const handleDownloadProof = async (e, fileUrl, fileName, holderName, docType) => {
     e.stopPropagation();
     if (!fileUrl) return;
 
-    const safeFileName =
-      fileName ||
-      `${holderName ? holderName.replace(/\s+/g, "_") : "ID"}_${docType || "Proof"}.jpg`;
+    const fullUrl = resolveDocUrl(fileUrl);
+    const token = getAuthToken();
 
-    const link = document.createElement("a");
-    link.href = fileUrl;
-    link.download = safeFileName;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const res = await fetch(fullUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Could not download file");
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const safeFileName =
+        fileName ||
+        `${holderName ? holderName.replace(/\s+/g, "_") : "ID"}_${docType || "Proof"}.jpg`;
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = safeFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(fullUrl, "_blank");
+    }
   };
 
   const handleOpenDoc = (docType, docName, holderName, docUrl) => {
+    const fullUrl = resolveDocUrl(docUrl);
     if (onOpenDocModal) {
-      onOpenDocModal(docType, docName, holderName, docUrl);
+      onOpenDocModal(docType, docName, holderName, fullUrl);
     } else {
-      setActiveDoc({ docType, docName, holderName, docUrl });
+      setActiveDoc({ docType, docName, holderName, docUrl: fullUrl });
       setScale(1);
       setRotation(0);
     }
@@ -369,28 +396,19 @@ export default function AdminDesk({
                     </td>
 
                     <td className="py-3 px-3">
-                      <div className="inline-flex items-center space-x-1">
-                        <button
-                          onClick={() => handleOpenDoc(v.idType, v.idDocName, v.name || v.visitorName, v.idDocUrl)}
-                          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-l-xl border border-slate-300 bg-white hover:bg-sky-50 hover:border-sky-500 transition shadow-xs text-xs font-semibold cursor-pointer"
-                        >
-                          <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-extrabold text-sky-700">
-                            {vExt}
-                          </span>
-                          <span className="text-slate-800 underline decoration-slate-300 underline-offset-2 truncate max-w-[85px]">
-                            {v.idDocName || "Visitor_ID"}
-                          </span>
-                          <Eye className="w-3.5 h-3.5 text-slate-400" />
-                        </button>
-                        <button
-                          onClick={(e) =>
-                            handleDownloadProof(e, v.idDocUrl, v.idDocName, v.name || v.visitorName, v.idType)
-                          }
-                          className="p-1.5 rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 hover:bg-sky-100 hover:text-sky-700 text-slate-600 transition cursor-pointer"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleOpenDoc(v.idType, v.idDocName, v.name || v.visitorName, v.idDocUrl)}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-sky-50 hover:border-sky-500 transition shadow-xs text-xs font-semibold cursor-pointer group"
+                        title="Click to view & inspect visitor document"
+                      >
+                        <span className="px-1.5 py-0.5 bg-sky-50 border border-sky-200 rounded text-[10px] font-mono font-extrabold text-sky-700">
+                          {vExt}
+                        </span>
+                        <span className="text-slate-800 underline decoration-slate-300 underline-offset-2 truncate max-w-[95px]">
+                          {v.idDocName || "Visitor_ID"}
+                        </span>
+                        <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-600 transition" />
+                      </button>
                     </td>
 
                     <td className="py-3 px-3 text-xs">
@@ -399,30 +417,21 @@ export default function AdminDesk({
                     </td>
 
                     <td className="py-3 px-3">
-                      <div className="inline-flex items-center space-x-1">
-                        <button
-                          onClick={() =>
-                            handleOpenDoc(v.hostIdDocType, v.hostDocName, v.hostName, v.hostDocUrl)
-                          }
-                          className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-l-xl border border-slate-300 bg-white hover:bg-amber-50 hover:border-amber-500 transition shadow-xs text-xs font-semibold cursor-pointer"
-                        >
-                          <span className="px-1.5 py-0.5 bg-slate-100 rounded text-[10px] font-mono font-extrabold text-amber-700">
-                            {hExt}
-                          </span>
-                          <span className="text-slate-800 underline decoration-slate-300 underline-offset-2">
-                            {v.hostIdDocType || "Host_Proof"}
-                          </span>
-                          <Eye className="w-3.5 h-3.5 text-slate-400" />
-                        </button>
-                        <button
-                          onClick={(e) =>
-                            handleDownloadProof(e, v.hostDocUrl, v.hostDocName, v.hostName, v.hostIdDocType)
-                          }
-                          className="p-1.5 rounded-r-xl border border-l-0 border-slate-300 bg-slate-50 hover:bg-amber-100 text-slate-600 transition cursor-pointer"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={() =>
+                          handleOpenDoc(v.hostIdDocType, v.hostDocName, v.hostName, v.hostDocUrl)
+                        }
+                        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-amber-50 hover:border-amber-500 transition shadow-xs text-xs font-semibold cursor-pointer group"
+                        title="Click to view & inspect host document"
+                      >
+                        <span className="px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded text-[10px] font-mono font-extrabold text-amber-700">
+                          {hExt}
+                        </span>
+                        <span className="text-slate-800 underline decoration-slate-300 underline-offset-2 truncate max-w-[110px]">
+                          {v.hostIdDocType || "Host_Proof"}
+                        </span>
+                        <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 transition" />
+                      </button>
                     </td>
 
                     <td className="py-3 px-3">

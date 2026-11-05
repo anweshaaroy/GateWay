@@ -36,54 +36,33 @@ export function usePwaInstall() {
     (window.matchMedia("(display-mode: standalone)").matches ||
       window.navigator.standalone === true);
 
-  const isInstallable = Boolean(deferredPromptGlobal) && !isStandalone;
+  const isInstallable = !isStandalone;
 
-  const installApp = async () => {
-    if (!deferredPromptGlobal) {
-      alert(
-        "To install GateWay:\n\n• On Android/Chrome: Tap 'Add to Home screen' or 'Install' from browser options.\n• On iPhone/iPad: Tap the Share icon in Safari and select 'Add to Home Screen'.\n• On PC: Click the Install icon in the browser address bar."
-      );
-      return;
-    }
-
-    try {
-      deferredPromptGlobal.prompt();
-      const choice = await deferredPromptGlobal.userChoice;
-      if (choice.outcome === "accepted") {
-        deferredPromptGlobal = null;
-        notifyListeners();
+  const directInstall = async () => {
+    if (deferredPromptGlobal) {
+      try {
+        deferredPromptGlobal.prompt();
+        const choice = await deferredPromptGlobal.userChoice;
+        if (choice.outcome === "accepted") {
+          deferredPromptGlobal = null;
+          notifyListeners();
+        }
+      } catch (err) {
+        console.error("Direct install error:", err);
       }
-    } catch (err) {
-      console.error("Installation prompt error:", err);
     }
   };
 
   return {
     isInstallable,
     isInstalled: isStandalone,
-    installApp,
+    hasNativePrompt: Boolean(deferredPromptGlobal),
+    directInstall,
   };
 }
 
-export function InstallButton({ className = "" }) {
-  const { isInstallable, installApp } = usePwaInstall();
-
-  if (!isInstallable) return null;
-
-  return (
-    <button
-      onClick={installApp}
-      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-sm transition-all duration-150 cursor-pointer ${className}`}
-      title="Install GateWay app on your device"
-    >
-      <Download className="w-3.5 h-3.5" />
-      <span>Install App</span>
-    </button>
-  );
-}
-
 export default function InstallPrompt() {
-  const { isInstallable, installApp } = usePwaInstall();
+  const { isInstallable, directInstall } = usePwaInstall();
   const [dismissed, setDismissed] = useState(false);
 
   if (!isInstallable || dismissed) return null;
@@ -91,22 +70,22 @@ export default function InstallPrompt() {
   return (
     <aside
       aria-label="App installation notification"
-      className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 bg-white border border-sky-100 rounded-2xl shadow-2xl p-4 z-50 flex items-center justify-between space-x-3 transition-all animate-bounce hover:animate-none"
+      className="fixed bottom-6 right-6 w-96 max-w-[calc(100vw-3rem)] bg-white border border-sky-100 rounded-2xl shadow-2xl p-4 z-[60] flex items-center justify-between space-x-3 transition-all animate-bounce hover:animate-none"
     >
       <div className="flex items-center space-x-3">
-        <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
           <Download className="w-5 h-5" />
         </div>
         <div>
           <h4 className="text-sm font-bold text-slate-800 leading-tight">Install GateWay App</h4>
-          <p className="text-xs text-slate-500">Download to your PC or Android for fast access.</p>
+          <p className="text-xs text-slate-500">1-Click direct install for PC & Android.</p>
         </div>
       </div>
 
       <div className="flex items-center space-x-2 shrink-0">
         <button
-          onClick={installApp}
-          className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition cursor-pointer"
+          onClick={directInstall}
+          className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition cursor-pointer"
         >
           Download
         </button>

@@ -4,7 +4,7 @@ import ResidentPortal from "./components/ResidentPortal";
 import AdminDesk from "./components/AdminDesk";
 import GuardTerminal from "./components/GuardTerminal";
 import { LargeDocModal, QrGeneratedModal } from "./components/Modals";
-import InstallPrompt, { InstallButton } from "./components/InstallPrompt";
+import InstallPrompt from "./components/InstallPrompt";
 import { ShieldCheck, LogOut, Clock } from "lucide-react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
@@ -307,7 +307,6 @@ export default function App() {
                   <strong className="font-mono text-slate-800">{formatSessionTime(timeLeft)}</strong>
                 </div>
 
-                <InstallButton />
                 <button
                   onClick={handleSignOut}
                   className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition cursor-pointer"
@@ -365,8 +364,8 @@ export default function App() {
         passData={approvedQrPass}
       />
 
-      {/* Cross-device PWA Install Banner */}
-      <InstallPrompt />
+      {/* Cross-device PWA Install Banner — ONLY shown on Login Portal */}
+      {!currentUser && <InstallPrompt />}
     </div>
   );
 }
