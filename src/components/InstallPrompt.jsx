@@ -92,7 +92,7 @@ export function InstallButton({ className = "" }) {
 
 export function InstallGuideModal({ onClose }) {
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in duration-150">
         <div className="bg-gradient-to-r from-sky-600 to-indigo-600 text-white p-5 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -171,7 +171,7 @@ export default function InstallPrompt() {
       <>
         <button
           onClick={() => triggerInstall(() => setShowGuide(true))}
-          className="fixed bottom-4 right-4 z-40 bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-2 rounded-full shadow-xl flex items-center space-x-2 text-xs font-semibold transition-all hover:scale-105 cursor-pointer border border-white/20"
+          className="fixed bottom-4 right-4 z-[60] bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-2 rounded-full shadow-xl flex items-center space-x-2 text-xs font-semibold transition-all hover:scale-105 cursor-pointer border border-white/20"
           title="Install GateWay PWA"
         >
           <Download className="w-4 h-4" />
@@ -187,7 +187,7 @@ export default function InstallPrompt() {
     <>
       <aside
         aria-label="App installation notification"
-        className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 bg-white border border-sky-100 rounded-2xl shadow-2xl p-4 z-40 flex items-center justify-between space-x-3 transition-all animate-bounce hover:animate-none"
+        className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 bg-white border border-sky-100 rounded-2xl shadow-2xl p-4 z-[60] flex items-center justify-between space-x-3 transition-all animate-bounce hover:animate-none"
       >
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md">
