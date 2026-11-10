@@ -18,6 +18,14 @@ import {
   ShieldCheck,
   Maximize2,
   RefreshCw,
+  Search,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  ExternalLink,
+  ChevronRight,
+  PieChart as PieChartIcon,
+  Calendar,
 } from "lucide-react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
@@ -47,6 +55,9 @@ export default function AdminDesk({
   const [rejectModalPass, setRejectModalPass] = useState(null);
   const [selectedRejectReason, setSelectedRejectReason] = useState(REJECTION_REASONS[0]);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [analyticsTimeframe, setAnalyticsTimeframe] = useState("ALL");
+  const [drawerCategory, setDrawerCategory] = useState(null);
+  const [drawerSearch, setDrawerSearch] = useState("");
 
   // Helper method to resolve available authentication token
   const getAuthToken = () => {
@@ -241,14 +252,91 @@ export default function AdminDesk({
     (v) => getApprovalStatus(v) === "Approved"
   ).length;
   const blacklistedCount = visitors.filter((v) => v?.blacklisted).length;
-  const academicCount = visitors.filter((v) =>
+
+  // Timeframe calculation for today's vs all-time analytics
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isTodayMatch = (v) => {
+    return (
+      (v.updatedAt && v.updatedAt.slice(0, 10) === todayStr) ||
+      (v.createdAt && v.createdAt.slice(0, 10) === todayStr) ||
+      (v.requestTimestamp && v.requestTimestamp.includes(todayStr)) ||
+      v.arrivalDate === todayStr
+    );
+  };
+
+  const analyticsPool =
+    analyticsTimeframe === "TODAY" ? visitors.filter(isTodayMatch) : visitors;
+
+  // Donut chart decision counts
+  const approvedAnalytics = analyticsPool.filter((v) => getApprovalStatus(v) === "Approved").length;
+  const rejectedAnalytics = analyticsPool.filter((v) => getApprovalStatus(v) === "Rejected").length;
+  const pendingAnalytics = analyticsPool.filter(
+    (v) => getApprovalStatus(v) === "Pending Approval" || getApprovalStatus(v) === "Pending"
+  ).length;
+  const decisionPoolCount = approvedAnalytics + rejectedAnalytics + pendingAnalytics;
+
+  // Percentage calculations
+  const approvedPct = decisionPoolCount ? approvedAnalytics / decisionPoolCount : 0;
+  const rejectedPct = decisionPoolCount ? rejectedAnalytics / decisionPoolCount : 0;
+  const pendingPct = decisionPoolCount ? pendingAnalytics / decisionPoolCount : 0;
+
+  // Donut circumference for r=58
+  const CIRCUMFERENCE = 364.42;
+  const approvedLen = approvedPct * CIRCUMFERENCE;
+  const rejectedLen = rejectedPct * CIRCUMFERENCE;
+  const pendingLen = pendingPct * CIRCUMFERENCE;
+
+  const clearanceRate =
+    approvedAnalytics + rejectedAnalytics > 0
+      ? Math.round((approvedAnalytics / (approvedAnalytics + rejectedAnalytics)) * 100)
+      : decisionPoolCount > 0
+      ? Math.round((approvedAnalytics / decisionPoolCount) * 100)
+      : 0;
+
+  // Real-time campus presence
+  const insideCampusCount = visitors.filter((v) => v?.status === "Inside Campus").length;
+  const completedCount = visitors.filter((v) => v?.status === "Completed").length;
+  const expectedCount = visitors.filter(
+    (v) =>
+      getApprovalStatus(v) === "Approved" &&
+      v?.status !== "Inside Campus" &&
+      v?.status !== "Completed"
+  ).length;
+
+  // Purpose & premises demographics
+  const academicCount = analyticsPool.filter((v) =>
     v?.purpose?.toLowerCase().includes("academic")
   ).length;
-  const personalCount = totalCount - academicCount;
-  const facultyHostCount = visitors.filter((v) =>
+  const personalCount = Math.max(0, analyticsPool.length - academicCount);
+  const facultyHostCount = analyticsPool.filter((v) =>
     v?.hostAddress?.toLowerCase().includes("faculty")
   ).length;
-  const hostelHostCount = totalCount - facultyHostCount;
+  const hostelHostCount = Math.max(0, analyticsPool.length - facultyHostCount);
+
+  // Visitors list for slide-over drawer drill-down
+  const drawerVisitors = drawerCategory
+    ? visitors.filter((v) => {
+        const status = getApprovalStatus(v);
+        const matchCat =
+          drawerCategory === "Approved"
+            ? status === "Approved"
+            : drawerCategory === "Rejected"
+            ? status === "Rejected"
+            : status === "Pending Approval" || status === "Pending";
+        if (!matchCat) return false;
+        if (!drawerSearch.trim()) return true;
+        const q = drawerSearch.toLowerCase();
+        return (
+          v.name?.toLowerCase().includes(q) ||
+          v.visitorName?.toLowerCase().includes(q) ||
+          v.passcode?.toLowerCase().includes(q) ||
+          v.id?.toLowerCase().includes(q) ||
+          v.hostName?.toLowerCase().includes(q) ||
+          v.hostAddress?.toLowerCase().includes(q) ||
+          v.email?.toLowerCase().includes(q)
+        );
+      })
+    : [];
 
   const filteredDirectory =
     filter === "ALL"
@@ -294,75 +382,339 @@ export default function AdminDesk({
         </div>
       </div>
 
-      {/* Visual Demographic Analytics */}
+      {/* Live Campus Security & Gate Clearance Intelligence (Donut + Live Gate Flow + Demographics) */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center space-x-2 mb-4 border-b border-slate-100 pb-3">
-          <BarChart3 className="w-5 h-5 text-sky-600" />
-          <h3 className="text-base sm:text-lg font-bold text-slate-900">Live Demographic &amp; Security Ratio Meters</h3>
+        {/* Section Header with Timeframe Toggle */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 border-b border-slate-100 pb-4">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-sky-50 rounded-xl text-sky-600 border border-sky-100">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                Live Campus Security &amp; Gate Clearance Intelligence
+              </h3>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Real-time IIT Ropar gate activity, decision ratios, and campus presence
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold shrink-0">
+            <button
+              onClick={() => setAnalyticsTimeframe("TODAY")}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                analyticsTimeframe === "TODAY"
+                  ? "bg-white text-sky-700 shadow-xs font-black"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Today</span>
+            </button>
+            <button
+              onClick={() => setAnalyticsTimeframe("ALL")}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                analyticsTimeframe === "ALL"
+                  ? "bg-white text-sky-700 shadow-xs font-black"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <span>All Time</span>
+            </button>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
-          <div className="space-y-2.5 bg-slate-50 p-4.5 rounded-xl border border-slate-200">
-            <div className="flex justify-between font-bold text-slate-800 text-sm">
-              <span className="flex items-center space-x-1.5">
-                <GraduationCap className="w-4.5 h-4.5 text-sky-600" />
-                <span>Academic ({academicCount})</span>
+        {/* 3-Column Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-sm">
+          {/* 1. Clearance Decision Donut Chart */}
+          <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/90 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-extrabold text-slate-900 text-sm flex items-center space-x-1.5">
+                <PieChartIcon className="w-4 h-4 text-sky-600" />
+                <span>Clearance Decision Ratio</span>
               </span>
-              <span>Personal ({personalCount})</span>
+              <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                {decisionPoolCount} Total
+              </span>
             </div>
-            <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden flex">
-              <div
-                className="bg-sky-600 h-full transition-all duration-500"
-                style={{ width: `${totalCount ? (academicCount / totalCount) * 100 : 50}%` }}
-              ></div>
-              <div
-                className="bg-amber-500 h-full transition-all duration-500"
-                style={{ width: `${totalCount ? (personalCount / totalCount) * 100 : 50}%` }}
-              ></div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-5 my-2">
+              {/* Interactive SVG Donut */}
+              <div className="relative w-[140px] h-[140px] shrink-0">
+                <svg viewBox="0 0 160 160" className="w-full h-full transform -rotate-90">
+                  {/* Background Track Circle */}
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="58"
+                    stroke="#e2e8f0"
+                    strokeWidth="16"
+                    fill="transparent"
+                  />
+                  {decisionPoolCount > 0 ? (
+                    <>
+                      {/* Approved Arc (Emerald) */}
+                      {approvedLen > 0 && (
+                        <circle
+                          cx="80"
+                          cy="80"
+                          r="58"
+                          stroke="#10b981"
+                          strokeWidth="16"
+                          strokeDasharray={`${approvedLen} ${CIRCUMFERENCE - approvedLen}`}
+                          strokeDashoffset="0"
+                          fill="transparent"
+                          strokeLinecap="round"
+                          className="transition-all duration-700 cursor-pointer hover:opacity-85"
+                          onClick={() => {
+                            setDrawerCategory("Approved");
+                            setDrawerSearch("");
+                          }}
+                        />
+                      )}
+                      {/* Rejected Arc (Rose) */}
+                      {rejectedLen > 0 && (
+                        <circle
+                          cx="80"
+                          cy="80"
+                          r="58"
+                          stroke="#f43f5e"
+                          strokeWidth="16"
+                          strokeDasharray={`${rejectedLen} ${CIRCUMFERENCE - rejectedLen}`}
+                          strokeDashoffset={-approvedLen}
+                          fill="transparent"
+                          strokeLinecap="round"
+                          className="transition-all duration-700 cursor-pointer hover:opacity-85"
+                          onClick={() => {
+                            setDrawerCategory("Rejected");
+                            setDrawerSearch("");
+                          }}
+                        />
+                      )}
+                      {/* Pending Arc (Amber) */}
+                      {pendingLen > 0 && (
+                        <circle
+                          cx="80"
+                          cy="80"
+                          r="58"
+                          stroke="#f59e0b"
+                          strokeWidth="16"
+                          strokeDasharray={`${pendingLen} ${CIRCUMFERENCE - pendingLen}`}
+                          strokeDashoffset={-(approvedLen + rejectedLen)}
+                          fill="transparent"
+                          strokeLinecap="round"
+                          className="transition-all duration-700 cursor-pointer hover:opacity-85"
+                          onClick={() => {
+                            setDrawerCategory("Pending");
+                            setDrawerSearch("");
+                          }}
+                        />
+                      )}
+                    </>
+                  ) : null}
+                </svg>
+
+                {/* Center Text inside Donut */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-2xl font-black text-slate-900 leading-none">
+                    {clearanceRate}%
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
+                    Clearance
+                  </span>
+                </div>
+              </div>
+
+              {/* Clickable Legend Badges */}
+              <div className="space-y-2 w-full sm:w-auto">
+                <button
+                  onClick={() => {
+                    setDrawerCategory("Approved");
+                    setDrawerSearch("");
+                  }}
+                  className="w-full flex items-center justify-between space-x-3 px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/70 transition cursor-pointer text-left group"
+                  title="Click to view Approved visitors"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
+                    <span className="text-xs font-bold text-emerald-950">Approved</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs font-black text-emerald-900">{approvedAnalytics}</span>
+                    <span className="text-[11px] text-emerald-700 font-semibold">
+                      ({Math.round(approvedPct * 100)}%)
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-emerald-600 opacity-60 group-hover:opacity-100 transition" />
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setDrawerCategory("Rejected");
+                    setDrawerSearch("");
+                  }}
+                  className="w-full flex items-center justify-between space-x-3 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100/70 transition cursor-pointer text-left group"
+                  title="Click to view Rejected visitors and reasons"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0"></span>
+                    <span className="text-xs font-bold text-rose-950">Rejected</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs font-black text-rose-900">{rejectedAnalytics}</span>
+                    <span className="text-[11px] text-rose-700 font-semibold">
+                      ({Math.round(rejectedPct * 100)}%)
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-rose-600 opacity-60 group-hover:opacity-100 transition" />
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setDrawerCategory("Pending");
+                    setDrawerSearch("");
+                  }}
+                  className="w-full flex items-center justify-between space-x-3 px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/70 transition cursor-pointer text-left group"
+                  title="Click to view Pending authorization queue"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
+                    <span className="text-xs font-bold text-amber-950">Pending</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs font-black text-amber-900">{pendingAnalytics}</span>
+                    <span className="text-[11px] text-amber-700 font-semibold">
+                      ({Math.round(pendingPct * 100)}%)
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-amber-600 opacity-60 group-hover:opacity-100 transition" />
+                  </div>
+                </button>
+              </div>
             </div>
-            <p className="text-xs font-semibold text-slate-500">Purpose classification ratio</p>
+
+            <p className="text-[11px] text-slate-500 font-medium text-center mt-1">
+              Click any category badge to inspect visitor details
+            </p>
           </div>
 
-          <div className="space-y-2.5 bg-slate-50 p-4.5 rounded-xl border border-slate-200">
-            <div className="flex justify-between font-bold text-slate-800 text-sm">
-              <span className="flex items-center space-x-1.5">
-                <Building className="w-4.5 h-4.5 text-emerald-600" />
-                <span>Faculty Qtrs ({facultyHostCount})</span>
+          {/* 2. Live Campus Gate Flow */}
+          <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/90 flex flex-col justify-between space-y-3.5">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-slate-900 text-sm flex items-center space-x-1.5">
+                <Users className="w-4 h-4 text-sky-600" />
+                <span>Live Campus Gate Flow</span>
               </span>
-              <span>Hostels ({hostelHostCount})</span>
+              <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Active</span>
+              </span>
             </div>
-            <div className="w-full bg-slate-200 h-3 rounded-full overflow-hidden flex">
-              <div
-                className="bg-emerald-600 h-full transition-all duration-500"
-                style={{ width: `${totalCount ? (facultyHostCount / totalCount) * 100 : 50}%` }}
-              ></div>
-              <div
-                className="bg-indigo-500 h-full transition-all duration-500"
-                style={{ width: `${totalCount ? (hostelHostCount / totalCount) * 100 : 50}%` }}
-              ></div>
+
+            {/* Currently Inside Campus Featured Metric */}
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700">Currently Inside Campus</span>
+                <span className="text-xl font-black text-emerald-600 font-mono">
+                  {insideCampusCount}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Non-resident guests physically checked-in at IIT Ropar gates
+              </p>
             </div>
-            <p className="text-xs font-semibold text-slate-500">Premises allocation distribution</p>
+
+            {/* Flow Items: Checked Out & Expected */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                <div className="text-slate-500 font-semibold text-[11px]">Checked Out</div>
+                <div className="text-lg font-black text-slate-800 font-mono mt-0.5">
+                  {completedCount}
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">Completed visits</div>
+              </div>
+
+              <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                <div className="text-slate-500 font-semibold text-[11px]">Expected Today</div>
+                <div className="text-lg font-black text-sky-700 font-mono mt-0.5">
+                  {expectedCount}
+                </div>
+                <div className="text-[10px] text-slate-400 font-medium mt-0.5">Approved arrivals</div>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500 font-medium text-center">
+              Gate status synced with Main &amp; Transit gate terminals
+            </p>
           </div>
 
-          <div className="space-y-2.5 bg-slate-50 p-4.5 rounded-xl border border-slate-200 flex flex-col justify-between">
-            <div className="flex justify-between font-bold text-slate-800 text-sm">
-              <span className="flex items-center space-x-1.5">
-                <Users className="w-4.5 h-4.5 text-slate-600" />
-                <span>Clearance Rate</span>
+          {/* 3. Premises & Purpose Demographics */}
+          <div className="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/90 flex flex-col justify-between space-y-3.5">
+            <div className="flex items-center justify-between">
+              <span className="font-extrabold text-slate-900 text-sm flex items-center space-x-1.5">
+                <Building className="w-4 h-4 text-sky-600" />
+                <span>Premises &amp; Purpose Allocation</span>
               </span>
-              <span className="text-emerald-700 font-black text-base">
-                {totalCount ? Math.round((approvedCount / totalCount) * 100) : 0}%
-              </span>
-            </div>
-            <div className="flex space-x-2 text-xs">
-              <span className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 font-bold border border-amber-300">
-                {pendingVisitors.length} Pending
-              </span>
-              <span className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-900 font-bold border border-rose-300">
-                {blacklistedCount} Flagged
+              <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                IIT Ropar
               </span>
             </div>
-            <p className="text-xs font-semibold text-slate-500">Overall gate pass approval ratio</p>
+
+            {/* Purpose Split */}
+            <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="flex justify-between font-bold text-slate-800 text-xs">
+                <span className="flex items-center space-x-1 text-sky-700">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>Academic ({academicCount})</span>
+                </span>
+                <span className="text-amber-700 font-bold">Personal ({personalCount})</span>
+              </div>
+              <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
+                <div
+                  className="bg-sky-600 h-full transition-all duration-500"
+                  style={{
+                    width: `${analyticsPool.length ? (academicCount / analyticsPool.length) * 100 : 50}%`,
+                  }}
+                ></div>
+                <div
+                  className="bg-amber-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${analyticsPool.length ? (personalCount / analyticsPool.length) * 100 : 50}%`,
+                  }}
+                ></div>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium">Research, faculty meets vs personal visits</p>
+            </div>
+
+            {/* Premises Allocation Split */}
+            <div className="space-y-1.5 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="flex justify-between font-bold text-slate-800 text-xs">
+                <span className="flex items-center space-x-1 text-indigo-700">
+                  <Building className="w-3.5 h-3.5" />
+                  <span>Hostels ({hostelHostCount})</span>
+                </span>
+                <span className="text-emerald-700 font-bold">Faculty Qtrs ({facultyHostCount})</span>
+              </div>
+              <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
+                <div
+                  className="bg-indigo-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${analyticsPool.length ? (hostelHostCount / analyticsPool.length) * 100 : 50}%`,
+                  }}
+                ></div>
+                <div
+                  className="bg-emerald-600 h-full transition-all duration-500"
+                  style={{
+                    width: `${analyticsPool.length ? (facultyHostCount / analyticsPool.length) * 100 : 50}%`,
+                  }}
+                ></div>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium">Satluj, Beas, Asikni vs Faculty Housing</p>
+            </div>
+
+            <p className="text-[11px] text-slate-500 font-medium text-center">
+              Campus premises distribution ratio
+            </p>
           </div>
         </div>
       </div>
@@ -872,6 +1224,183 @@ export default function AdminDesk({
                     <span>Confirm Rejection &amp; Send Mail</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Quick Slide-Over Modal Drawer (Interactive drill-down from Donut Chart) */}
+      {drawerCategory && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-2xs animate-in fade-in duration-200">
+          <div
+            className="fixed inset-0"
+            onClick={() => setDrawerCategory(null)}
+          ></div>
+          <div className="relative w-full max-w-lg bg-white h-full shadow-2xl border-l border-slate-200 flex flex-col z-10 animate-in slide-in-from-right duration-200">
+            {/* Drawer Header */}
+            <div
+              className={`p-5 text-white flex items-center justify-between shrink-0 ${
+                drawerCategory === "Approved"
+                  ? "bg-emerald-800"
+                  : drawerCategory === "Rejected"
+                  ? "bg-rose-900"
+                  : "bg-amber-800"
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white">
+                  {drawerCategory === "Approved" ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+                  ) : drawerCategory === "Rejected" ? (
+                    <XCircle className="w-5 h-5 text-rose-300" />
+                  ) : (
+                    <Clock className="w-5 h-5 text-amber-300" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base tracking-tight text-white">
+                    {drawerCategory} Visitors Directory
+                  </h3>
+                  <p className="text-xs text-white/80 font-medium mt-0.5">
+                    {drawerVisitors.length} record{drawerVisitors.length === 1 ? "" : "s"} &bull; IIT Ropar Campus
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDrawerCategory(null)}
+                className="text-white/80 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition cursor-pointer"
+                title="Close drawer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Drawer Search & Filter */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 shrink-0">
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter by name, passcode, or hostel..."
+                  value={drawerSearch}
+                  onChange={(e) => setDrawerSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition"
+                />
+              </div>
+            </div>
+
+            {/* Drawer Visitor List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {drawerVisitors.map((v) => {
+                const vid = getId(v);
+                return (
+                  <div
+                    key={vid}
+                    className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs hover:border-slate-300 transition space-y-2.5 text-xs"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="font-bold text-sm text-slate-900">
+                          {v.name || v.visitorName}
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium">
+                          {v.email || v.visitorEmail}
+                        </div>
+                      </div>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          drawerCategory === "Approved"
+                            ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                            : drawerCategory === "Rejected"
+                            ? "bg-rose-100 text-rose-900 border border-rose-300"
+                            : "bg-amber-100 text-amber-900 border border-amber-300"
+                        }`}
+                      >
+                        Pass: {v.passcode}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-50 rounded-lg p-2.5 space-y-1 text-[11px] border border-slate-100">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-medium">Host Resident:</span>
+                        <span className="font-bold text-slate-800">{v.hostName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-medium">Hostel / Address:</span>
+                        <span className="text-slate-700 truncate max-w-[200px]">{v.hostAddress}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-medium">Visit Dates:</span>
+                        <span className="text-slate-700 font-medium">
+                          {v.arrivalDate} to {v.exitDate}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 font-medium">Purpose:</span>
+                        <span className="text-slate-700 font-medium capitalize">
+                          {v.purpose || "Personal"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Show Rejection Reason if Rejected */}
+                    {drawerCategory === "Rejected" && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-900">
+                        <span className="font-bold text-rose-800">Rejection Reason: </span>
+                        <span>{v.rejectionReason || "Entry restricted as per security policy."}</span>
+                      </div>
+                    )}
+
+                    {/* Quick action pill button */}
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        ID: {v.id || v._id}
+                      </span>
+                      <div className="flex items-center space-x-1.5">
+                        {v.idDocName && (
+                          <button
+                            onClick={() =>
+                              handleOpenDoc(v.idType, v.idDocName, v.name || v.visitorName, v.idDocUrl)
+                            }
+                            className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold text-slate-700 transition cursor-pointer flex items-center space-x-1"
+                          >
+                            <Eye className="w-3 h-3 text-slate-500" />
+                            <span>Inspect ID</span>
+                          </button>
+                        )}
+                        {v.hostDocName && (
+                          <button
+                            onClick={() =>
+                              handleOpenDoc(v.hostIdDocType, v.hostDocName, v.hostName, v.hostDocUrl)
+                            }
+                            className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-[11px] font-bold text-slate-700 transition cursor-pointer flex items-center space-x-1"
+                          >
+                            <Eye className="w-3 h-3 text-slate-500" />
+                            <span>Host Proof</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {drawerVisitors.length === 0 && (
+                <div className="text-center py-12 text-slate-400 text-xs font-medium">
+                  No visitors found in this category.
+                </div>
+              )}
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0 text-xs">
+              <span className="text-slate-500 font-medium">
+                Total: <strong>{drawerVisitors.length}</strong> records
+              </span>
+              <button
+                onClick={() => setDrawerCategory(null)}
+                className="px-4 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition cursor-pointer"
+              >
+                Close Drawer
               </button>
             </div>
           </div>
