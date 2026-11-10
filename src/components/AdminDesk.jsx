@@ -375,15 +375,15 @@ export default function AdminDesk({
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-100/80 text-slate-700 uppercase text-xs font-extrabold tracking-wider border-b border-slate-200">
+            <thead className="bg-slate-100/90 text-slate-700 uppercase text-xs font-extrabold tracking-wider border-b border-slate-200">
               <tr>
-                <th className="py-3.5 px-4">Passcode</th>
-                <th className="py-3.5 px-4">Visitor Info &amp; Request Time</th>
-                <th className="py-3.5 px-4">Visitor ID Proof</th>
-                <th className="py-3.5 px-4">Host Info &amp; Location</th>
-                <th className="py-3.5 px-4">Host ID Proof</th>
-                <th className="py-3.5 px-4">Clearance Status</th>
-                <th className="py-3.5 px-4 text-right">Approval Decision</th>
+                <th className="py-3.5 px-3.5 whitespace-nowrap">Passcode</th>
+                <th className="py-3.5 px-3.5 whitespace-nowrap">Visitor Info &amp; Request Time</th>
+                <th className="py-3.5 px-3.5 text-center whitespace-nowrap">Visitor ID Proof</th>
+                <th className="py-3.5 px-3.5 whitespace-nowrap">Host Info &amp; Location</th>
+                <th className="py-3.5 px-3.5 text-center whitespace-nowrap">Host ID Proof</th>
+                <th className="py-3.5 px-3.5 text-center whitespace-nowrap">Clearance Status</th>
+                <th className="py-3.5 px-3.5 text-right whitespace-nowrap">Approval Decision</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -398,73 +398,73 @@ export default function AdminDesk({
                       v.blacklisted ? "bg-rose-50/70" : ""
                     }`}
                   >
-                    <td className="py-4 px-4 font-mono font-black text-lg text-slate-900">
+                    <td className="py-3.5 px-3.5 font-mono font-black text-base text-slate-900 whitespace-nowrap">
                       {v.passcode}
                       {v.blacklisted && (
-                        <span className="block text-xs text-rose-600 font-sans font-extrabold mt-0.5">
+                        <span className="block text-[10px] text-rose-600 font-sans font-extrabold mt-0.5">
                           FLAGGED
                         </span>
                       )}
                     </td>
-                    <td className="py-4 px-4">
-                      <div className="font-bold text-slate-900 text-base">{v.name || v.visitorName}</div>
-                      <div className="text-sm text-slate-600 font-medium">{v.email || v.visitorEmail}</div>
-                      <div className="text-xs text-slate-500 font-medium mt-0.5">
+                    <td className="py-3.5 px-3.5 min-w-[170px]">
+                      <div className="font-bold text-slate-900 text-sm">{v.name || v.visitorName}</div>
+                      <div className="text-xs text-slate-600 font-medium">{v.email || v.visitorEmail}</div>
+                      <div className="text-[11px] text-slate-500 font-medium mt-0.5 whitespace-nowrap">
                         Requested: <strong className="text-slate-700">{v.requestTimestamp || v.createdAt?.slice(0, 10) || "Just now"}</strong>
                       </div>
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="py-3.5 px-3.5 text-center whitespace-nowrap">
                       <button
                         onClick={() => handleOpenDoc(v.idType, v.idDocName, v.name || v.visitorName, v.idDocUrl)}
-                        className="flex items-center space-x-2 px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-sky-50 hover:border-sky-500 transition shadow-xs text-sm font-bold cursor-pointer group"
-                        title="Click to view & inspect visitor document"
+                        className="w-[128px] h-[32px] inline-flex items-center justify-between space-x-1.5 px-2.5 rounded-lg border border-slate-300 bg-white hover:bg-sky-50 hover:border-sky-400 transition shadow-2xs text-xs font-semibold cursor-pointer group"
+                        title={`Click to inspect: ${v.idDocName || "Visitor ID"}`}
                       >
-                        <span className="px-2 py-0.5 bg-sky-100 border border-sky-300 rounded text-xs font-mono font-black text-sky-800">
+                        <span className="px-1.5 py-0.5 bg-sky-50 border border-sky-200 rounded text-[10px] font-mono font-bold text-sky-700 shrink-0">
                           {vExt}
                         </span>
-                        <span className="text-slate-900 underline decoration-slate-300 underline-offset-2 truncate max-w-[120px]">
+                        <span className="text-slate-800 underline decoration-slate-300 underline-offset-2 truncate flex-1 text-left text-xs font-medium">
                           {v.idDocName || "Visitor_ID"}
                         </span>
-                        <Eye className="w-4 h-4 text-slate-400 group-hover:text-sky-600 transition shrink-0" />
+                        <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-600 transition shrink-0" />
                       </button>
                     </td>
 
-                    <td className="py-4 px-4 text-sm">
-                      <div className="font-bold text-slate-900 text-base">{v.hostName}</div>
-                      <div className="text-sm text-slate-600 font-medium">{v.hostAddress}</div>
+                    <td className="py-3.5 px-3.5 text-sm min-w-[170px]">
+                      <div className="font-bold text-slate-900 text-sm">{v.hostName}</div>
+                      <div className="text-xs text-slate-600 font-medium">{v.hostAddress}</div>
                     </td>
 
-                    <td className="py-4 px-4">
+                    <td className="py-3.5 px-3.5 text-center whitespace-nowrap">
                       <button
                         onClick={() =>
                           handleOpenDoc(v.hostIdDocType, v.hostDocName, v.hostName, v.hostDocUrl)
                         }
-                        className="flex items-center space-x-2 px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-amber-50 hover:border-amber-500 transition shadow-xs text-sm font-bold cursor-pointer group"
-                        title="Click to view & inspect host document"
+                        className="w-[128px] h-[32px] inline-flex items-center justify-between space-x-1.5 px-2.5 rounded-lg border border-slate-300 bg-white hover:bg-amber-50 hover:border-amber-400 transition shadow-2xs text-xs font-semibold cursor-pointer group"
+                        title={`Click to inspect: ${v.hostDocName || v.hostIdDocType || "Host Proof"}`}
                       >
-                        <span className="px-2 py-0.5 bg-amber-100 border border-amber-300 rounded text-xs font-mono font-black text-amber-800">
+                        <span className="px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded text-[10px] font-mono font-bold text-amber-700 shrink-0">
                           {hExt}
                         </span>
-                        <span className="text-slate-900 underline decoration-slate-300 underline-offset-2 truncate max-w-[130px]">
-                          {v.hostIdDocType || "Host_Proof"}
+                        <span className="text-slate-800 underline decoration-slate-300 underline-offset-2 truncate flex-1 text-left text-xs font-medium">
+                          {v.hostDocName || v.hostIdDocType || "Host_Proof"}
                         </span>
-                        <Eye className="w-4 h-4 text-slate-400 group-hover:text-amber-600 transition shrink-0" />
+                        <Eye className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 transition shrink-0" />
                       </button>
                     </td>
 
-                    <td className="py-4 px-4">
-                      <span className="px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-extrabold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                    <td className="py-3.5 px-3.5 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap shadow-2xs">
                         Pending Review
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-right">
-                      <div className="inline-flex items-center space-x-2">
+                    <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
+                      <div className="inline-flex items-center space-x-1.5">
                         <button
                           onClick={() => handleApprovePass(vid)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2 rounded-xl transition flex items-center space-x-1.5 shadow-sm cursor-pointer"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition inline-flex items-center space-x-1 shadow-xs cursor-pointer"
                         >
-                          <Check className="w-4 h-4" />
+                          <Check className="w-3.5 h-3.5" />
                           <span>Approve</span>
                         </button>
                         <button
@@ -472,21 +472,21 @@ export default function AdminDesk({
                             setSelectedRejectReason(REJECTION_REASONS[0]);
                             setRejectModalPass(v);
                           }}
-                          className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm px-4 py-2 rounded-xl transition flex items-center space-x-1.5 shadow-sm cursor-pointer"
+                          className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition inline-flex items-center space-x-1 shadow-xs cursor-pointer"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                           <span>Reject</span>
                         </button>
                         <button
                           onClick={() => handleToggleBlacklist(vid, v.blacklisted)}
-                          className={`p-2 rounded-xl border transition cursor-pointer ${
+                          className={`p-1.5 rounded-lg border transition cursor-pointer ${
                             v.blacklisted
                               ? "bg-rose-600 text-white border-rose-700"
                               : "bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 border-slate-300"
                           }`}
                           title={v.blacklisted ? "Unflag Visitor" : "Flag / Blacklist Visitor"}
                         >
-                          <ShieldAlert className="w-4.5 h-4.5" />
+                          <ShieldAlert className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -576,9 +576,9 @@ export default function AdminDesk({
                       <div className="font-medium">{v.arrivalDate} to {v.exitDate}</div>
                       <div className="text-xs text-sky-700 font-bold mt-0.5">{v.durationDays} Days</div>
                     </td>
-                    <td className="py-4 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs sm:text-sm font-extrabold ${
+                        className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
                           approvalStatus === "Approved"
                             ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
                             : approvalStatus === "Rejected"
@@ -589,9 +589,9 @@ export default function AdminDesk({
                         {approvalStatus}
                       </span>
                     </td>
-                    <td className="py-4 px-4">
+                    <td className="py-3.5 px-4 whitespace-nowrap">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs sm:text-sm font-bold ${
+                        className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                           v.status === "Inside Campus"
                             ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
                             : v.status === "Completed"
