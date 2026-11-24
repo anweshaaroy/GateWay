@@ -284,8 +284,8 @@ export default function App() {
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <div>
-                  <h1 className="font-extrabold text-xl leading-tight text-slate-900 tracking-tight">GateWay</h1>
-                  <p className="text-xs text-slate-500 font-medium">Smart Campus Access &amp; Pre-Approval System</p>
+                  <h1 className="font-black text-xl sm:text-2xl leading-tight text-slate-900 tracking-tight">GateWay</h1>
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium">Smart Campus Access &amp; Pre-Approval System</p>
                 </div>
               </div>
 

@@ -358,9 +358,6 @@ export default function AdminDesk({
             <ShieldAlert className="w-6 h-6 text-sky-600 shrink-0" />
             <span>Security Admin Desk</span>
           </h2>
-          <p className="text-sm text-slate-600 mt-1 font-medium">
-            Verify credentials, cross-check identity proofs, and grant campus entry clearance
-          </p>
         </div>
         <div className="flex items-center space-x-2.5">
           <button
@@ -592,10 +589,6 @@ export default function AdminDesk({
                 </button>
               </div>
             </div>
-
-            <p className="text-[11px] text-slate-500 font-medium text-center mt-1">
-              Click any category badge to inspect visitor details
-            </p>
           </div>
 
           {/* 2. Live Campus Gate Flow */}
@@ -642,10 +635,6 @@ export default function AdminDesk({
                 <div className="text-[10px] text-slate-400 font-medium mt-0.5">Approved arrivals</div>
               </div>
             </div>
-
-            <p className="text-[11px] text-slate-500 font-medium text-center">
-              Gate status synced with Main &amp; Transit gate terminals
-            </p>
           </div>
 
           {/* 3. Premises & Purpose Demographics */}
@@ -711,10 +700,6 @@ export default function AdminDesk({
               </div>
               <p className="text-[10px] text-slate-400 font-medium">Satluj, Beas, Asikni vs Faculty Housing</p>
             </div>
-
-            <p className="text-[11px] text-slate-500 font-medium text-center">
-              Campus premises distribution ratio
-            </p>
           </div>
         </div>
       </div>
