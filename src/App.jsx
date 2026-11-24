@@ -278,38 +278,38 @@ export default function App() {
       {currentUser && (
         <>
           <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-            <div className="max-w-7xl mx-auto px-4 h-18 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="bg-sky-600 text-white p-2.5 rounded-xl shadow-xs">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 min-h-[72px] py-3.5 flex items-center justify-between gap-4">
+              <div className="flex items-center space-x-3 shrink-0">
+                <div className="w-11 h-11 bg-sky-600 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <div>
-                  <h1 className="font-extrabold text-xl leading-tight text-slate-900">GateWay</h1>
+                  <h1 className="font-extrabold text-xl leading-tight text-slate-900 tracking-tight">GateWay</h1>
                   <p className="text-xs text-slate-500 font-medium">Smart Campus Access &amp; Pre-Approval System</p>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
-                <div className="hidden sm:flex items-center space-x-2.5 bg-slate-50/90 px-4 py-2 rounded-xl border border-slate-200/90 text-sm shadow-2xs">
+              <div className="flex items-center space-x-2.5 sm:space-x-3 shrink-0">
+                <div className="hidden sm:inline-flex items-center space-x-2 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm shadow-2xs">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-                  <span className="text-slate-500 font-medium text-xs sm:text-sm">Signed in as:</span>
-                  <strong className="text-slate-900 font-bold font-mono text-xs sm:text-sm">
+                  <span className="text-slate-500 font-medium">Signed in as:</span>
+                  <strong className="text-slate-900 font-bold font-mono">
                     {currentUser.email} ({currentUser.role?.toUpperCase()})
                   </strong>
                 </div>
 
                 <div
-                  className="hidden md:flex items-center space-x-2 bg-slate-50/90 px-3.5 py-2 rounded-xl border border-slate-200/90 text-sm shadow-2xs"
+                  className="hidden md:inline-flex items-center space-x-1.5 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm shadow-2xs"
                   title="Session will expire after 10 minutes"
                 >
                   <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                  <span className="text-slate-500 font-medium text-xs sm:text-sm">Session:</span>
-                  <strong className="font-mono font-bold text-slate-900 text-xs sm:text-sm">{formatSessionTime(timeLeft)}</strong>
+                  <span className="text-slate-500 font-medium">Session:</span>
+                  <strong className="font-mono font-bold text-slate-900">{formatSessionTime(timeLeft)}</strong>
                 </div>
 
                 <button
                   onClick={handleSignOut}
-                  className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 shadow-2xs transition cursor-pointer"
+                  className="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 shadow-2xs transition cursor-pointer"
                   title="Sign out of current terminal"
                 >
                   <LogOut className="w-4 h-4 shrink-0" />
