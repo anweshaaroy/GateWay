@@ -174,25 +174,31 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       {/* Left Form Column */}
       <div className="lg:col-span-7 bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
-          <div className="flex items-center space-x-2">
-            <TicketPlus className="w-5 h-5 text-sky-600" />
-            <h2 className="font-bold text-slate-800 text-base">Visitor Pre-Registration</h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 border-b border-slate-100 pb-4 gap-3">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 bg-sky-50 rounded-xl text-sky-600 border border-sky-100">
+              <TicketPlus className="w-5 h-5 text-sky-600" />
+            </div>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                Visitor Pre-Registration
+              </h2>
+            </div>
           </div>
-          <span className="text-xs text-sky-700 font-semibold bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200">
+          <span className="text-xs font-bold text-sky-700 bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-200 shadow-2xs">
             {activeUser?.role?.toUpperCase() || "RESIDENT"} PORTAL ACTIVE
           </span>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Section 1: Visitor Details */}
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          <div className="space-y-3.5">
+            <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">
               1. Visitor Details
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                   Visitor Full Name *
                 </label>
                 <input
@@ -201,11 +207,11 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                   placeholder="e.g. Rahul Sharma"
                   value={visitorName}
                   onChange={(e) => setVisitorName(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                  className="w-full text-sm font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition bg-white text-slate-900 placeholder-slate-400 shadow-2xs"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                   Visitor Email Address *
                 </label>
                 <input
@@ -214,28 +220,28 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                   placeholder="e.g. rahul.sharma@example.com"
                   value={visitorEmail}
                   onChange={(e) => setVisitorEmail(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                  className="w-full text-sm font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition bg-white text-slate-900 placeholder-slate-400 shadow-2xs"
                 />
               </div>
             </div>
 
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/90 space-y-3.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                     Govt. ID Document *
                   </label>
                   <select
                     value={idType}
                     onChange={(e) => setIdType(e.target.value)}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 shadow-2xs cursor-pointer"
                   >
                     <option value="Aadhaar Card">Aadhaar Card</option>
                     <option value="Passport">Passport</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                     {idType === "Aadhaar Card" ? "Aadhaar Number *" : "Passport Number *"}
                   </label>
                   <input
@@ -245,51 +251,46 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                     maxLength={idType === "Aadhaar Card" ? 12 : 8}
                     value={idNumber}
                     onChange={(e) => setIdNumber(e.target.value)}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono focus:ring-2 focus:ring-sky-500 outline-none"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 shadow-2xs"
                   />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    {idType === "Aadhaar Card"
-                      ? "Exactly 12 numeric digits required."
-                      : "1 letter followed by 7 digits."}
-                  </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5 flex items-center justify-between">
                   <span>Upload Visitor ID Proof (JPG / PDF only) *</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Formats: .jpg, .jpeg, .pdf</span>
+                  <span className="text-xs text-slate-400 font-medium">Formats: .jpg, .jpeg, .pdf</span>
                 </label>
                 <input
                   type="file"
                   accept=".jpg,.jpeg,.pdf"
                   onChange={handleVisitorFile}
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
+                  className="w-full text-xs font-medium text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer"
                 />
               </div>
             </div>
 
             {/* Accompanying Members / Headcount */}
-            <div className="bg-sky-50/70 p-3.5 rounded-xl border border-sky-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="bg-sky-50/70 p-4 rounded-2xl border border-sky-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
               <div>
-                <label className="block text-xs font-bold text-slate-800">
+                <label className="block text-sm font-black text-slate-900">
                   Accompanying Family / Group Members
                 </label>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-xs text-slate-500 font-medium mt-0.5">
                   Visiting with family? Enter how many additional persons are accompanying (excluding lead visitor).
                 </p>
               </div>
               <div className="flex items-center space-x-2 shrink-0">
-                <span className="text-xs text-slate-500 font-semibold">+</span>
+                <span className="text-sm font-bold text-slate-500">+</span>
                 <input
                   type="number"
                   min="0"
                   max="30"
                   value={accompanyingCount}
                   onChange={(e) => setAccompanyingCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="w-20 text-center text-sm font-bold px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                  className="w-20 text-center text-sm font-black px-3 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 shadow-2xs"
                 />
-                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 border border-sky-200">
+                <span className="text-xs font-bold px-3 py-1.5 rounded-xl bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
                   Total: {1 + Number(accompanyingCount)} {1 + Number(accompanyingCount) === 1 ? "Person" : "Persons"}
                 </span>
               </div>
@@ -297,13 +298,13 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
           </div>
 
           {/* Section 2: Host Details */}
-          <div className="space-y-3 pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          <div className="space-y-3.5 pt-4 border-t border-slate-100">
+            <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">
               2. Host Verification (Resident Details)
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                   Host Name *
                 </label>
                 <input
@@ -311,18 +312,18 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                   required
                   value={hostName}
                   onChange={(e) => setHostName(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                  className="w-full text-sm font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none bg-white text-slate-900 shadow-2xs"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                   Host Hostel / Campus Address *
                 </label>
                 <div className="space-y-2">
                   <select
                     value={selectedHostel}
                     onChange={(e) => setSelectedHostel(e.target.value)}
-                    className="w-full text-xs font-semibold px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer text-slate-900 shadow-2xs"
                   >
                     <option value="Satluj (Boys Hostel)">Satluj (Boys Hostel)</option>
                     <option value="Beas (Boys Hostel)">Beas (Boys Hostel)</option>
@@ -341,21 +342,21 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                     placeholder="Room / Block No. (Optional, e.g. Room 204)"
                     value={roomNumber}
                     onChange={(e) => setRoomNumber(e.target.value)}
-                    className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                    className="w-full text-sm font-medium px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 shadow-2xs"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200 space-y-3">
+            <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/90 space-y-3.5 shadow-2xs">
               <div>
-                <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                   Host ID Document *
                 </label>
                 <select
                   value={hostIdDocType}
                   onChange={(e) => setHostIdDocType(e.target.value)}
-                  className="w-full text-sm px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                  className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 shadow-2xs"
                 >
                   <option value="Student College ID Card">Student College ID Card</option>
                   <option value="Faculty Official ID">Faculty Official ID</option>
@@ -364,28 +365,28 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-800 mb-1.5 flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5 flex items-center justify-between">
                   <span>Upload Host ID Proof (JPG / PDF only) *</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Formats: .jpg, .jpeg, .pdf</span>
+                  <span className="text-xs text-slate-400 font-medium">Formats: .jpg, .jpeg, .pdf</span>
                 </label>
                 <input
                   type="file"
                   accept=".jpg,.jpeg,.pdf"
                   onChange={handleHostFile}
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className="w-full text-xs font-medium text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                 />
               </div>
             </div>
           </div>
 
           {/* Section 3: Visit Window & Purpose */}
-          <div className="space-y-3 pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          <div className="space-y-3.5 pt-4 border-t border-slate-100">
+            <h3 className="text-sm font-black uppercase tracking-wider text-slate-900">
               3. Visit Window & Purpose
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/50 p-3.5 rounded-xl border border-sky-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/50 p-4 rounded-2xl border border-sky-100 shadow-2xs">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                   Arrival Date *
                 </label>
                 <input
@@ -393,11 +394,11 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                   required
                   value={arrivalDate}
                   onChange={(e) => setArrivalDate(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                  className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 shadow-2xs"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                   Expected Departure Date *
                 </label>
                 <input
@@ -405,19 +406,19 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                   required
                   value={exitDate}
                   onChange={(e) => setExitDate(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                  className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 shadow-2xs"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide mb-1.5">
                 Purpose of Visit
               </label>
               <select
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
-                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
+                className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 bg-white shadow-2xs cursor-pointer"
               >
                 <option value="Personal / Guest">Personal / Guest</option>
                 <option value="Academic Collaboration">Academic Collaboration</option>
@@ -430,16 +431,16 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full mt-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
+            className="w-full mt-3 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-400 text-white font-extrabold py-3 px-5 rounded-xl text-sm sm:text-base transition shadow-md flex items-center justify-center space-x-2 cursor-pointer"
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Submitting to Server...</span>
               </>
             ) : (
               <>
-                <Send className="w-4 h-4" />
+                <Send className="w-5 h-5" />
                 <span>Submit for Security Approval</span>
               </>
             )}

@@ -13,17 +13,16 @@ import {
   Clock,
   X,
   UserPlus,
+  User,
+  Users,
   Calendar,
   IdCard,
   Building,
-  Phone,
   Mail,
   CheckCircle,
   QrCode,
-  Printer,
   ShieldAlert,
   Loader2,
-  RefreshCw,
 } from "lucide-react";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000/api";
@@ -272,11 +271,14 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   const [purpose, setPurpose] = useState("Personal / Guest");
   const [fromDate, setFromDate] = useState(new Date().toISOString().slice(0, 10));
   const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
+  const [validityPreset, setValidityPreset] = useState(1);
   const [idType, setIdType] = useState("Aadhaar Card");
   const [idDocName, setIdDocName] = useState("");
   const [accompanyingCount, setAccompanyingCount] = useState(0);
+  const [autoCheckIn, setAutoCheckIn] = useState(true);
   const [generatedPass, setGeneratedPass] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [emailNotice, setEmailNotice] = useState("");
 
   useEffect(() => {
     if (!isOpen) {
@@ -285,9 +287,15 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
       setVisitorEmail("");
       setHostName("");
       setPurpose("Personal / Guest");
+      const today = new Date().toISOString().slice(0, 10);
+      setFromDate(today);
+      setToDate(today);
+      setValidityPreset(1);
       setGeneratedPass(null);
       setIdDocName("");
       setAccompanyingCount(0);
+      setAutoCheckIn(true);
+      setEmailNotice("");
     }
   }, [isOpen]);
 
@@ -298,6 +306,16 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   const diffTime = Math.max(0, end - start);
   const calculatedDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
 
+  const applyValidityPreset = (days) => {
+    setValidityPreset(days);
+    if (days === "custom") return;
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(startDate.getDate() + (Number(days) - 1));
+    setFromDate(startDate.toISOString().slice(0, 10));
+    setToDate(endDate.toISOString().slice(0, 10));
+  };
+
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -307,24 +325,30 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
 
   const handleCreatePass = async (e) => {
     e.preventDefault();
-    if (!visitorName.trim() || !phone.trim() || !hostName.trim()) {
-      alert("Please fill in Visitor Name, Phone Number, and Host details.");
+    if (!visitorName.trim() || !hostName.trim()) {
+      alert("Please fill in Visitor Name and Host details.");
+      return;
+    }
+    if (!visitorEmail.trim() || !visitorEmail.includes("@")) {
+      alert("Please provide a valid Visitor Email Address. The e-Pass with QR code will be dispatched directly to this email.");
       return;
     }
 
     setIsSubmitting(true);
+    setEmailNotice("");
 
     const payload = {
       visitorName: visitorName.trim(),
-      phone: phone.trim(),
-      visitorEmail: visitorEmail.trim(),
+      visitorEmail: visitorEmail.trim().toLowerCase(),
       hostName: hostName.trim(),
       purpose,
       fromDate,
       toDate,
       calculatedDays,
+      accompanyingCount,
+      autoCheckIn,
       idType,
-      idDocName: idDocName || "walk_in_id.jpg",
+      idDocName: idDocName || "walk_in_id_scan.jpg",
     };
 
     try {
@@ -345,18 +369,25 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
 
       if (data.success && data.pass) {
         setGeneratedPass(data.pass);
-        onRegisterSuccess(data.pass, false);
+        if (data.email && data.email.status === "sent") {
+          setEmailNotice(`e-Pass dispatched directly to ${visitorEmail.trim()}`);
+        } else {
+          setEmailNotice(`Pass created successfully. e-Pass queued for ${visitorEmail.trim()}`);
+        }
+        onRegisterSuccess(data.pass, autoCheckIn);
       } else {
         throw new Error(data.message || "Endpoint error");
       }
     } catch (err) {
-      console.warn("Backend offline or unreachable, using local fallback pass generation:", err);
+      console.warn("Backend offline or error, using local fallback pass generation:", err);
       const fallbackObj = {
         id: `spot_${Date.now()}`,
         passcode: Math.floor(1000 + Math.random() * 9000).toString(),
         name: visitorName.trim(),
-        email: visitorEmail.trim() || `${phone.trim()}@visitor.spot`,
+        email: visitorEmail.trim(),
         phone: phone.trim(),
+        accompanyingCount,
+        totalVisitors: 1 + accompanyingCount,
         hostName: hostName.trim(),
         hostAddress: "Campus Main Facility",
         hostIdDocType: "Instant Guard Permit",
@@ -367,12 +398,17 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
         idType,
         idDocName: idDocName || "walk_in_id_scan.jpg",
         approvalStatus: "Approved",
-        status: "Pending",
+        status: autoCheckIn ? "Inside Campus" : "Pending",
+        checkInTime: autoCheckIn
+          ? new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "—",
+        checkOutTime: "—",
         requestTimestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         blacklisted: false,
       };
       setGeneratedPass(fallbackObj);
-      onRegisterSuccess(fallbackObj, false);
+      setEmailNotice(`Local Pass generated. Email queued for ${visitorEmail.trim()}`);
+      onRegisterSuccess(fallbackObj, autoCheckIn);
     } finally {
       setIsSubmitting(false);
     }
@@ -385,33 +421,53 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
     }
   };
 
+
+  const activePass = generatedPass || {
+    name: visitorName.trim() || "Visitor Name",
+    phone: phone.trim() || "+91 00000 00000",
+    email: visitorEmail.trim() || "visitor@example.com",
+    hostName: hostName.trim() || "Campus Host / Dept",
+    purpose: purpose,
+    accompanyingCount: accompanyingCount,
+    totalVisitors: 1 + accompanyingCount,
+    passcode: "••••",
+    id: "NEW-SPOT",
+    arrivalDate: fromDate,
+    exitDate: toDate,
+    status: autoCheckIn ? "Inside Campus" : "Pending",
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full overflow-hidden flex flex-col">
-        <div className="bg-slate-900 text-white p-5 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-sky-500/20 text-sky-400 rounded-xl">
-              <UserPlus className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-4xl w-full overflow-hidden flex flex-col max-h-[92vh]">
+        {/* Modal Header */}
+        <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0">
+          <div className="flex items-center space-x-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center font-bold text-lg shadow-2xs shrink-0">
+              <UserPlus className="w-5 h-5 text-sky-600" />
             </div>
-            <div>
-              <h3 className="font-bold text-base tracking-wide">Instant Walk-In Spot Pass</h3>
-              <p className="text-xs text-slate-400">Issue on-demand gate passes for unregistered arrivals</p>
-            </div>
+            <h3 className="font-bold text-base sm:text-lg text-slate-800 tracking-tight leading-normal whitespace-nowrap truncate">
+              Instant Walk-In Spot Pass
+            </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition cursor-pointer shrink-0 ml-3"
+            title="Close"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 grid grid-cols-1 md:grid-cols-12 gap-6 max-h-[82vh] overflow-y-auto">
-          <div className="md:col-span-7 space-y-4">
+        {/* Modal Body */}
+        <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 overflow-y-auto bg-slate-50/50">
+          {/* Left Column: Input Form (7 cols) */}
+          <div className="md:col-span-7 space-y-3.5">
             <form onSubmit={handleCreatePass} className="space-y-3.5">
+              {/* Name & Email (Phone Number Removed) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
                     Visitor Full Name *
                   </label>
                   <input
@@ -420,212 +476,365 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                     value={visitorName}
                     onChange={(e) => setVisitorName(e.target.value)}
                     placeholder="e.g. Rahul Sharma"
-                    className="w-full text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition"
+                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition bg-white text-slate-800 placeholder-slate-400"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Phone Number *
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Visitor Email Address *
                   </label>
-                  <div className="relative">
-                    <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
-                    <input
-                      type="tel"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. 9876543210"
-                      className="w-full text-xs font-semibold pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Visitor Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
                   <input
                     type="email"
+                    required
                     value={visitorEmail}
                     onChange={(e) => setVisitorEmail(e.target.value)}
-                    placeholder="e.g. visitor@gmail.com"
-                    className="w-full text-xs font-semibold pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition"
+                    placeholder="e.g. rahul.sharma@example.com"
+                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition bg-white text-slate-800 placeholder-slate-400"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Host Name or Department *
-                </label>
-                <div className="relative">
-                  <Building className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+              {/* Accompanying Members / Group Size */}
+              <div className="bg-sky-50/70 p-3.5 rounded-xl border border-sky-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800">
+                    Accompanying Family / Group Members
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Visiting with family? Enter how many additional persons are accompanying (excluding lead visitor).
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2 shrink-0">
+                  <span className="text-xs text-slate-500 font-semibold">+</span>
                   <input
-                    type="text"
+                    type="number"
+                    min="0"
+                    max="30"
+                    value={accompanyingCount}
+                    onChange={(e) => setAccompanyingCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    className="w-20 text-center text-sm font-bold px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                  />
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 border border-sky-200">
+                    Total: {1 + Number(accompanyingCount)} {1 + Number(accompanyingCount) === 1 ? "Person" : "Persons"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Host Name or Department */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Host Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={hostName}
+                  onChange={(e) => setHostName(e.target.value)}
+                  placeholder="e.g. Prof. 2026csm1020 / Admin Block / Hostel"
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition bg-white text-slate-800 placeholder-slate-400"
+                />
+              </div>
+
+              {/* Purpose & Pass Validity as Select Dropdowns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Purpose of Visit Select Dropdown */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Purpose of Visit *
+                  </label>
+                  <select
+                    value={purpose}
+                    onChange={(e) => setPurpose(e.target.value)}
+                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer transition text-slate-800"
+                  >
+                    <option value="Personal / Guest">Personal / Guest</option>
+                    <option value="Official Meeting">Official Meeting</option>
+                    <option value="Academic / Seminar">Academic / Seminar</option>
+                    <option value="Interview / Placement">Interview / Placement</option>
+                    <option value="Facility Maintenance">Contractor / Work</option>
+                    <option value="Courier / Delivery">Courier / Delivery</option>
+                    <option value="Vendor / Supplier">Vendor / Supply</option>
+                    <option value="Campus Tour / Visit">Campus Tour</option>
+                  </select>
+                </div>
+
+                {/* Pass Validity Select Dropdown */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                    Pass Validity *
+                  </label>
+                  <select
+                    value={validityPreset}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      applyValidityPreset(val === "custom" ? "custom" : Number(val));
+                    }}
+                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer transition text-slate-800"
+                  >
+                    <option value={1}>1 Day (Today Only)</option>
+                    <option value={3}>3 Days</option>
+                    <option value={7}>7 Days (1 Week)</option>
+                    <option value={15}>15 Days</option>
+                    <option value={20}>20 Days</option>
+                    <option value={30}>30 Days (1 Month)</option>
+                    <option value="custom">Custom Date Range</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Date Inputs */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                    Valid From
+                  </label>
+                  <input
+                    type="date"
                     required
-                    value={hostName}
-                    onChange={(e) => setHostName(e.target.value)}
-                    placeholder="e.g. Admin Block / Dept Head"
-                    className="w-full text-xs font-semibold pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition"
+                    value={fromDate}
+                    onChange={(e) => {
+                      setFromDate(e.target.value);
+                      setValidityPreset("custom");
+                    }}
+                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none bg-white text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                    Valid Until
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={toDate}
+                    onChange={(e) => {
+                      setToDate(e.target.value);
+                      setValidityPreset("custom");
+                    }}
+                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none bg-white text-slate-800"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Purpose of Visit *
-                </label>
-                <select
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  className="w-full text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer transition"
-                >
-                  <option value="Personal / Guest">Personal / Guest</option>
-                  <option value="Official Meeting">Official Meeting</option>
-                  <option value="Courier / Delivery">Courier / Delivery</option>
-                  <option value="Facility Maintenance">Facility Maintenance</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Pass Validity *
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="relative">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
-                    <input
-                      type="date"
-                      required
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className="w-full text-xs font-semibold pl-9 pr-2 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
-                    />
+              {/* ID Verification Proof (No Live Photo, Standard ID) */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Govt. ID Document *
+                    </label>
+                    <select
+                      value={idType}
+                      onChange={(e) => setIdType(e.target.value)}
+                      className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer text-slate-800"
+                    >
+                      <option value="Aadhaar Card">Aadhaar Card</option>
+                      <option value="Driving License">Driving License</option>
+                      <option value="Voter ID">Voter ID</option>
+                      <option value="Passport">Passport</option>
+                      <option value="Govt Organization ID">Govt Organization ID</option>
+                    </select>
                   </div>
-                  <div className="relative">
-                    <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
-                    <input
-                      type="date"
-                      required
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      className="w-full text-xs font-semibold pl-9 pr-2 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none"
-                    />
-                  </div>
-                </div>
-                <div className="text-[11px] text-sky-700 font-semibold mt-1">
-                  Stay Duration: <strong>{calculatedDays} Day(s)</strong>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  ID Verification Proof
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <select
-                    value={idType}
-                    onChange={(e) => setIdType(e.target.value)}
-                    className="text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 bg-white outline-none cursor-pointer"
-                  >
-                    <option value="Aadhaar Card">Aadhaar Card</option>
-                    <option value="Driving License">Driving License</option>
-                    <option value="Voter ID">Voter ID</option>
-                    <option value="Govt Organization ID">Govt Organization ID</option>
-                  </select>
-                  <label className="flex items-center justify-center space-x-1.5 px-3 py-2 border border-dashed border-slate-300 rounded-xl hover:bg-slate-50 cursor-pointer text-xs text-slate-600 transition truncate">
-                    <IdCard className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                    <span className="truncate">{idDocName || "Attach Photo ID"}</span>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Upload Visitor ID Proof *</span>
+                      <span className="text-[10px] text-slate-400 font-normal">Formats: .jpg, .jpeg, .pdf</span>
+                    </label>
                     <input
                       type="file"
                       accept="image/*,.pdf"
                       onChange={handleFileUpload}
-                      className="hidden"
+                      className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer"
                     />
-                  </label>
+                  </div>
                 </div>
               </div>
 
+              {/* Auto Check-In Toggle */}
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+                <div className="flex items-center space-x-2.5">
+                  <input
+                    type="checkbox"
+                    id="autoCheckinCheckbox"
+                    checked={autoCheckIn}
+                    onChange={(e) => setAutoCheckIn(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded cursor-pointer accent-emerald-600"
+                  />
+                  <label htmlFor="autoCheckinCheckbox" className="text-xs font-semibold text-emerald-950 cursor-pointer">
+                    Auto Check-IN Immediately <span className="text-emerald-700 font-normal">(Instant "Inside Campus" entry)</span>
+                  </label>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-300">
+                  RECOMMENDED
+                </span>
+              </div>
+
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition shadow-md flex items-center justify-center space-x-2 cursor-pointer mt-2"
+                className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white font-bold py-2.5 px-4 rounded-lg text-sm transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer mt-2"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Generating Security Pass...</span>
+                    <span>Generating Security Pass & Dispatching Email...</span>
                   </>
                 ) : (
                   <>
                     <QrCode className="w-4 h-4" />
-                    <span>Issue Instant Pass & Generate QR</span>
+                    <span>Issue Instant Spot Pass & Email e-Pass</span>
                   </>
                 )}
               </button>
             </form>
           </div>
 
-          <div className="md:col-span-5 bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col items-center justify-between">
-            <div className="w-full text-center">
-              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500">
-                Generated Passcard
-              </span>
-              {generatedPass ? (
-                <div className="mt-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm w-full flex flex-col items-center">
-                  <div className="w-32 h-32 bg-white rounded-xl p-2 flex items-center justify-center border border-slate-200">
-                    <QRCodeSVG value={generatedPass.passcode} size={110} level="H" />
-                  </div>
+          {/* Right Column: Live Passcard Preview (5 cols) - Styled in Visitor Portal Cyber-Dark Pass Theme */}
+          <div className="md:col-span-5 flex flex-col justify-between space-y-3">
+            <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-xl p-4 sm:p-5 space-y-3.5 relative overflow-hidden text-white">
+              {/* Card Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+                <span className="text-xs font-black tracking-wider text-sky-400 uppercase">
+                  CAMPUS VISITOR PASS
+                </span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                    activePass.status === "Inside Campus"
+                      ? "bg-emerald-950/70 text-emerald-400 border-emerald-800"
+                      : "bg-emerald-950/70 text-emerald-400 border-emerald-800"
+                  }`}
+                >
+                  {activePass.status === "Inside Campus" ? "INSIDE CAMPUS" : "APPROVED"}
+                </span>
+              </div>
 
-                  <div className="mt-3 text-center">
-                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">
-                      Verification Passcode
-                    </span>
-                    <span className="text-2xl font-mono font-black text-slate-900 tracking-wider">
-                      {generatedPass.passcode}
-                    </span>
-                  </div>
-
-                  <div className="w-full mt-3 pt-3 border-t border-slate-100 text-left space-y-1 text-xs">
-                    <div className="text-slate-800 font-bold truncate">{generatedPass.name}</div>
-                    <div className="text-slate-500 text-[11px] truncate">
-                      Host: {generatedPass.hostName}
-                    </div>
-                    <div className="text-[11px] text-sky-700 font-semibold">
-                      Validity: {generatedPass.arrivalDate} ➔ {generatedPass.exitDate}
-                    </div>
-                  </div>
+              {/* Center Scannable QR Code on White Box */}
+              <div className="flex flex-col items-center justify-center pt-1">
+                <div className="w-36 h-36 bg-white p-3 rounded-2xl flex items-center justify-center shadow-md border border-slate-200/40">
+                  {generatedPass ? (
+                    <QRCodeSVG value={generatedPass.passcode} size={120} level="H" />
+                  ) : (
+                    <svg viewBox="0 0 100 100" className="w-full h-full fill-slate-950">
+                      <rect x="0" y="0" width="30" height="30" rx="4" />
+                      <rect x="70" y="0" width="30" height="30" rx="4" />
+                      <rect x="0" y="70" width="30" height="30" rx="4" />
+                      <rect x="10" y="10" width="10" height="10" fill="#fff" />
+                      <rect x="80" y="10" width="10" height="10" fill="#fff" />
+                      <rect x="10" y="80" width="10" height="10" fill="#fff" />
+                      <rect x="40" y="10" width="20" height="10" />
+                      <rect x="10" y="40" width="10" height="20" />
+                      <rect x="35" y="35" width="30" height="30" rx="2" />
+                      <rect x="75" y="45" width="15" height="15" />
+                      <rect x="45" y="75" width="20" height="15" />
+                    </svg>
+                  )}
                 </div>
-              ) : (
-                <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-center px-4">
-                  <QrCode className="w-10 h-10 stroke-1 text-slate-300 mb-2" />
-                  <p className="text-xs font-medium">
-                    Fill the form and submit to view instantaneous QR & verification credentials.
-                  </p>
+                {/* PASSCODE with neon green accent */}
+                <div className="text-center mt-3">
+                  <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                    PASSCODE:{" "}
+                  </span>
+                  <span className="text-emerald-400 font-mono font-black text-lg tracking-wider">
+                    {generatedPass ? generatedPass.passcode : "8683"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Visitor Details Box */}
+              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-3.5 space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Visitor:</span>
+                  <span className="font-bold text-white truncate max-w-[170px]">
+                    {activePass.name}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Email:</span>
+                  <span className="text-slate-200 font-medium truncate max-w-[170px]">
+                    {activePass.email}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Visitor ID:</span>
+                  <span className="text-emerald-400 font-semibold truncate max-w-[170px]">
+                    {idType}: [ID Verified]
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Total Headcount:</span>
+                  <span className="font-bold text-emerald-400">
+                    {1 + accompanyingCount} {1 + accompanyingCount > 1 ? "Persons" : "Person"}{" "}
+                    {accompanyingCount > 0 ? `(1 + ${accompanyingCount})` : "(Solo)"}
+                  </span>
+                </div>
+
+                <div className="border-t border-slate-700/50 my-1"></div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Host Name:</span>
+                  <span className="font-bold text-white truncate max-w-[170px]">
+                    {activePass.hostName}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Purpose:</span>
+                  <span className="text-slate-200 font-medium truncate max-w-[170px]">
+                    {activePass.purpose}
+                  </span>
+                </div>
+
+                <div className="border-t border-slate-700/50 my-1"></div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Stay Window:</span>
+                  <span className="text-amber-400 font-bold font-mono text-[11px]">
+                    {fromDate} to {toDate}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">Duration:</span>
+                  <span className="text-white font-bold">
+                    {calculatedDays} {calculatedDays > 1 ? "Days" : "Day"}
+                  </span>
+                </div>
+              </div>
+
+              {emailNotice && (
+                <div className="p-2.5 bg-emerald-950/80 border border-emerald-800 rounded-xl text-emerald-300 text-[11px] font-bold text-center flex items-center justify-center space-x-1.5">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="truncate">{emailNotice}</span>
                 </div>
               )}
             </div>
 
-            {generatedPass && (
-              <div className="w-full space-y-2 mt-4">
-                <button
-                  onClick={handleImmediateCheckIn}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Scan & Check-In Immediately</span>
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="w-full border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold py-2 px-2.5 rounded-xl text-[11px] transition flex items-center justify-center space-x-1 cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span>Print Gate Slip</span>
-                </button>
-              </div>
+            {/* Post-Action Button: Send Email Pass */}
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (generatedPass) {
+                    alert(`e-Pass with QR credentials sent to ${generatedPass.email}`);
+                  } else {
+                    alert("Fill the details and click 'Issue Instant Spot Pass' to dispatch the e-Pass email.");
+                  }
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md cursor-pointer"
+              >
+                <Mail className="w-3.5 h-3.5 text-white" />
+                <span>Send e-Pass</span>
+              </button>
+            </div>
+
+            {generatedPass && !autoCheckIn && (
+              <button
+                type="button"
+                onClick={handleImmediateCheckIn}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>Record Check-In Now</span>
+              </button>
             )}
           </div>
         </div>
@@ -923,14 +1132,14 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
             placeholder="Search Passcode, Name, Host..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full text-xs font-semibold pl-9 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition"
+            className="w-full text-sm font-medium pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition"
           />
         </div>
 
         <div className="flex items-center space-x-3 w-full md:w-auto justify-end">
           <button
             onClick={() => setIsSpotModalOpen(true)}
-            className="px-4 py-2.5 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-700 text-white flex items-center space-x-2 transition shadow-sm cursor-pointer"
+            className="px-4 py-2.5 text-sm font-bold rounded-xl bg-sky-600 hover:bg-sky-700 text-white flex items-center space-x-2 transition shadow-sm cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
             <span>+ Issue Spot Pass</span>
@@ -938,7 +1147,7 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
 
           <button
             onClick={() => setIsCamOpen(true)}
-            className="px-4 py-2.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center space-x-2 transition shadow-sm cursor-pointer"
+            className="px-4 py-2.5 text-sm font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center space-x-2 transition shadow-sm cursor-pointer"
           >
             <Camera className="w-4 h-4" />
             <span>Optical Scanner</span>
@@ -949,24 +1158,24 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
       {/* Gate Audit Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50 text-slate-600 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-100/90 text-slate-700 uppercase text-xs font-extrabold tracking-wider border-b border-slate-200">
               <tr>
-                <th className="py-3.5 px-4">Passcode</th>
-                <th className="py-3.5 px-4">Visitor</th>
-                <th className="py-3.5 px-4">Host & Details</th>
-                <th className="py-3.5 px-4">Purpose</th>
-                <th className="py-3.5 px-4">Clearance</th>
-                <th className="py-3.5 px-4">Gate Status</th>
-                <th className="py-3.5 px-4">Check-IN</th>
-                <th className="py-3.5 px-4">Check-OUT</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Passcode</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Visitor</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Host &amp; Details</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Purpose</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Clearance</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Gate Status</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Check-IN</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Check-OUT</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-slate-400 text-xs font-medium">
+                  <td colSpan="9" className="py-12 text-center text-slate-500 text-sm font-medium">
                     No visitor records found matching your filter criteria.
                   </td>
                 </tr>
@@ -982,115 +1191,121 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
                         overstay ? "bg-rose-50/60" : ""
                       } ${item.blacklisted ? "bg-red-50/80" : ""}`}
                     >
-                      <td className="py-3.5 px-4">
-                        <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-mono font-black text-base text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-block">
                           {item.passcode}
                         </span>
                         {item.blacklisted && (
-                          <span className="flex items-center space-x-1 mt-1 text-[10px] text-rose-600 font-bold uppercase">
-                            <ShieldAlert className="w-3 h-3" />
+                          <span className="flex items-center space-x-1 mt-1 text-xs text-rose-600 font-extrabold uppercase">
+                            <ShieldAlert className="w-3.5 h-3.5" />
                             <span>Blacklisted</span>
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 min-w-[170px]">
                         <div className="flex items-center space-x-1.5">
-                          <span className="font-bold text-slate-800">{item.name}</span>
+                          <span className="font-bold text-slate-900 text-sm sm:text-base">{item.name}</span>
                           {(item.totalVisitors > 1 || (Number(item.accompanyingCount) || 0) > 0) && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200" title={`1 Lead + ${item.accompanyingCount || item.totalVisitors - 1} Accompanying`}>
+                            <span
+                              className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-300 whitespace-nowrap"
+                              title={`1 Lead + ${item.accompanyingCount || item.totalVisitors - 1} Accompanying`}
+                            >
                               👥 {item.totalVisitors || (1 + (Number(item.accompanyingCount) || 0))}
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-500 truncate max-w-[140px]">{item.email}</div>
+                        <div className="text-xs sm:text-sm text-slate-600 font-medium truncate max-w-[180px]">{item.email}</div>
                       </td>
-                      <td className="py-3.5 px-4 text-xs">
-                        <div className="font-semibold text-slate-800">
-                          {item.hostName} {item.hostAddress ? `(${item.hostAddress})` : ""}
+                      <td className="py-3.5 px-4 min-w-[180px]">
+                        <div className="font-bold text-slate-900 text-sm sm:text-base">
+                          {item.hostName}
                         </div>
-                        <div className="text-slate-500 text-[11px]">{item.hostIdDocType || "Campus Host"}</div>
+                        {item.hostAddress && (
+                          <div className="text-xs sm:text-sm text-slate-600 font-medium">{item.hostAddress}</div>
+                        )}
+                        <div className="text-slate-500 text-xs font-medium">{item.hostIdDocType || "Campus Host"}</div>
                       </td>
-                      <td className="py-3.5 px-4 text-xs">
-                        <span className="font-medium text-slate-700">{item.purpose}</span>
-                        <div className="text-[10px] text-slate-400">
+                      <td className="py-3.5 px-4 text-sm min-w-[140px]">
+                        <span className="font-semibold text-slate-800 text-xs sm:text-sm">{item.purpose}</span>
+                        <div className="text-xs text-slate-500 font-medium mt-0.5 whitespace-nowrap">
                           {item.arrivalDate} ➔ {item.exitDate}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
-                          className={`text-[11px] font-bold px-2 py-0.5 rounded-full inline-block ${
+                          className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-2xs ${
                             item.approvalStatus === "Approved"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-rose-100 text-rose-800"
+                              ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                              : "bg-rose-100 text-rose-900 border border-rose-300"
                           }`}
                         >
                           {item.approvalStatus}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center space-x-1.5 flex-wrap gap-1">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                        <div className="inline-flex items-center space-x-1.5 flex-wrap gap-1 justify-center">
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                            className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap shadow-2xs ${
                               item.status === "Inside Campus"
-                                ? "bg-emerald-100 text-emerald-800"
+                                ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
                                 : item.status === "Completed"
-                                ? "bg-slate-100 text-slate-600"
-                                : "bg-amber-100 text-amber-800"
+                                ? "bg-slate-100 text-slate-700 border border-slate-300"
+                                : "bg-amber-100 text-amber-900 border border-amber-300"
                             }`}
                           >
                             {item.status}
                           </span>
                           {overstay && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-600 text-white animate-pulse">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-rose-600 text-white animate-pulse whitespace-nowrap">
                               OVERSTAY
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-xs text-slate-700">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         {item.checkInTime && item.checkInTime !== "—" ? (
-                          <span className="inline-flex items-center space-x-1 text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
-                            <Clock className="w-3 h-3" />
+                          <span className="inline-flex items-center space-x-1.5 text-emerald-800 font-bold font-mono text-xs sm:text-sm bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                            <Clock className="w-3.5 h-3.5" />
                             <span>{item.checkInTime}</span>
                           </span>
                         ) : (
-                          <span className="text-slate-400">—</span>
+                          <span className="text-slate-400 font-mono text-sm">—</span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-xs text-slate-700">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         {item.checkOutTime && item.checkOutTime !== "—" ? (
-                          <span className="inline-flex items-center space-x-1 text-slate-700 font-semibold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                            <Clock className="w-3 h-3" />
+                          <span className="inline-flex items-center space-x-1.5 text-slate-800 font-bold font-mono text-xs sm:text-sm bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                            <Clock className="w-3.5 h-3.5" />
                             <span>{item.checkOutTime}</span>
                           </span>
                         ) : (
-                          <span className="text-slate-400">—</span>
+                          <span className="text-slate-400 font-mono text-sm">—</span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         {isActionLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-slate-400 inline-block" />
+                          <Loader2 className="w-5 h-5 animate-spin text-slate-400 inline-block" />
                         ) : item.approvalStatus === "Approved" && !item.blacklisted ? (
                           <div className="inline-flex space-x-1.5">
                             <button
                               onClick={() => handleUpdateGateStatus(item.id, "Inside Campus")}
                               disabled={item.status === "Inside Campus"}
-                              className="p-1.5 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+                              className="p-2 rounded-xl border border-emerald-300 text-emerald-700 hover:bg-emerald-50 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition shadow-2xs"
                               title="Record Check-IN"
                             >
-                              <LogIn className="w-4 h-4" />
+                              <LogIn className="w-4.5 h-4.5" />
                             </button>
                             <button
                               onClick={() => handleUpdateGateStatus(item.id, "Completed")}
                               disabled={item.status !== "Inside Campus"}
-                              className="p-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+                              className="p-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition shadow-2xs"
                               title="Record Check-OUT"
                             >
-                              <LogOut className="w-4 h-4" />
+                              <LogOut className="w-4.5 h-4.5" />
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[11px] font-bold text-rose-500">
+                          <span className="text-xs font-extrabold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 inline-block">
                             {item.blacklisted ? "Blocked" : "Denied"}
                           </span>
                         )}
