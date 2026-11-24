@@ -68,26 +68,37 @@ export const createSpotPass = asyncHandler(async (req, res) => {
   const purpose = String(body.purpose || "Personal / Guest").trim();
   const arrivalDate = String(body.fromDate || "").trim();
   const exitDate = String(body.toDate || "").trim();
-  const idType = ["Passport", "Aadhaar Card"].includes(body.idType) ? body.idType : "Aadhaar Card";
-  if (!name || !phone || !hostName || !arrivalDate || !exitDate) throw httpError(400, "Visitor name, phone, host, and dates are required.");
+  const idType = ["Passport", "Aadhaar Card", "Driving License", "Voter ID", "Govt Organization ID"].includes(body.idType) ? body.idType : "Aadhaar Card";
+  if (!name || !hostName || !arrivalDate || !exitDate) throw httpError(400, "Visitor name, host, and dates are required.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(arrivalDate) || !/^\d{4}-\d{2}-\d{2}$/.test(exitDate) || exitDate < arrivalDate) throw httpError(400, "Enter valid visit dates; departure cannot be before arrival.");
   if (emailInput && !/^\S+@\S+\.\S+$/.test(emailInput)) throw httpError(400, "Enter a valid visitor email or leave it blank.");
   const durationDays = Math.round((new Date(`${exitDate}T00:00:00Z`) - new Date(`${arrivalDate}T00:00:00Z`)) / 86400000) + 1;
   const accompanyingCount = Math.max(0, Math.min(100, parseInt(body.accompanyingCount, 10) || 0));
   const totalVisitors = 1 + accompanyingCount;
-  const email = emailInput || `walkin-${phone.replace(/\D/g, "").slice(-12)}@invalid.local`;
+  const email = emailInput || (phone ? `walkin-${phone.replace(/\D/g, "").slice(-12)}@invalid.local` : `walkin-${Date.now()}@invalid.local`);
+  const autoCheckIn = body.autoCheckIn === true || body.autoCheckIn === "true" || body.autoCheckIn === 1;
+  const initialStatus = autoCheckIn ? "Inside Campus" : "Pending";
+  const initialCheckInTime = autoCheckIn ? timeLabel() : "—";
+  const visitHistory = [{ action: "WALK_IN_PASS_CREATED", actor: req.user._id, notes: "Walk-in pass issued by gate security." }];
+  if (autoCheckIn) {
+    visitHistory.push({ action: "CHECK_IN", actor: req.user._id, notes: "Auto check-in recorded on pass issuance." });
+  }
+
   const visitor = await Visitor.create({
     id: await createUniqueVisitorId(), passcode: await createUniquePasscode(), qrToken: createQrToken(), requester: req.user._id,
-    name, email, phone, idType, idNumber: "[Walk-in ID verified by guard]", idDocName: String(body.idDocName || "").slice(0, 160), idDocUrl: null,
+    name, email, phone: phone || "—", idType, idNumber: "[Walk-in ID verified by guard]", idDocName: String(body.idDocName || "").slice(0, 160), idDocUrl: null,
     accompanyingCount, totalVisitors,
     hostName, hostEmail: req.user.email, hostAddress: "Campus Main Facility", hostIdDocType: "Instant Guard Permit", hostDocName: "", hostDocUrl: null,
-    purpose, arrivalDate, exitDate, durationDays, approvalStatus: "Approved", status: "Pending", requestTimestamp: timeLabel(), blacklisted: false,
-    emailDeliveryStatus: "not_sent", visitHistory: [{ action: "WALK_IN_PASS_CREATED", actor: req.user._id, notes: "Walk-in pass issued by gate security." }],
+    purpose, arrivalDate, exitDate, durationDays, approvalStatus: "Approved", status: initialStatus, checkInTime: initialCheckInTime, requestTimestamp: timeLabel(), blacklisted: false,
+    emailDeliveryStatus: "not_sent", visitHistory,
   });
-  await writeAudit(req, { action: "WALK_IN_PASS_CREATED", visitor, message: `Walk-in visitor pass ${visitor.id} issued by security.` });
+  await writeAudit(req, { action: "WALK_IN_PASS_CREATED", visitor, message: `Walk-in visitor pass ${visitor.id} issued by security.${autoCheckIn ? " (Auto Check-In completed)" : ""}` });
+  if (autoCheckIn) {
+    await writeAudit(req, { action: "VISITOR_CHECK_IN", visitor, message: `Visitor ${visitor.id} checked in at gate via spot pass issuance.` });
+  }
   let emailResult = { status: "not_sent", message: "No visitor email provided for the walk-in pass." };
   if (emailInput) emailResult = await sendApprovedPassEmail(req, visitor);
-  res.status(201).json({ success: true, message: "Walk-in pass created.", pass: visitor, visitor, email: emailResult });
+  res.status(201).json({ success: true, message: autoCheckIn ? "Walk-in pass issued and visitor checked-in." : "Walk-in pass created.", pass: visitor, visitor, email: emailResult });
 });
 
 export const searchVisitors = asyncHandler(async (req, res) => {
