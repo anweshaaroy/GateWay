@@ -277,42 +277,42 @@ export default function App() {
 
       {currentUser && (
         <>
-          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+            <div className="max-w-7xl mx-auto px-4 h-18 flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="bg-sky-600 text-white p-2 rounded-xl shadow-sm">
+                <div className="bg-sky-600 text-white p-2.5 rounded-xl shadow-xs">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <div>
-                  <h1 className="font-bold text-lg leading-tight text-slate-900">GateWay</h1>
-                  <p className="text-xs text-slate-500 font-medium">Smart Campus Access & Pre-Approval System</p>
+                  <h1 className="font-extrabold text-xl leading-tight text-slate-900">GateWay</h1>
+                  <p className="text-xs text-slate-500 font-medium">Smart Campus Access &amp; Pre-Approval System</p>
                 </div>
               </div>
 
               <div className="flex items-center space-x-3">
-                <div className="hidden sm:flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span className="text-slate-500">Signed in as:</span>
-                  <strong className="text-slate-800 font-mono">
+                <div className="hidden sm:flex items-center space-x-2.5 bg-slate-50/90 px-4 py-2 rounded-xl border border-slate-200/90 text-sm shadow-2xs">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                  <span className="text-slate-500 font-medium text-xs sm:text-sm">Signed in as:</span>
+                  <strong className="text-slate-900 font-bold font-mono text-xs sm:text-sm">
                     {currentUser.email} ({currentUser.role?.toUpperCase()})
                   </strong>
                 </div>
 
                 <div
-                  className="hidden md:flex items-center space-x-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 text-xs"
+                  className="hidden md:flex items-center space-x-2 bg-slate-50/90 px-3.5 py-2 rounded-xl border border-slate-200/90 text-sm shadow-2xs"
                   title="Session will expire after 10 minutes"
                 >
-                  <Clock className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="text-slate-500">Session:</span>
-                  <strong className="font-mono text-slate-800">{formatSessionTime(timeLeft)}</strong>
+                  <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span className="text-slate-500 font-medium text-xs sm:text-sm">Session:</span>
+                  <strong className="font-mono font-bold text-slate-900 text-xs sm:text-sm">{formatSessionTime(timeLeft)}</strong>
                 </div>
 
                 <button
                   onClick={handleSignOut}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition cursor-pointer"
+                  className="flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 shadow-2xs transition cursor-pointer"
                   title="Sign out of current terminal"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-4 h-4 shrink-0" />
                   <span>Sign Out</span>
                 </button>
               </div>
