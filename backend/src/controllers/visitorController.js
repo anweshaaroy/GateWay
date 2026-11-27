@@ -45,7 +45,7 @@ export const createVisitorRequest = asyncHandler(async (req, res) => {
   const rawIdNumber = String(body.idNumber || "").trim();
   const hostName = String(body.hostName || req.user.name || req.user.email).trim();
   const hostAddress = String(body.hostAddress || "").trim();
-  const hostIdDocType = String(body.hostIdDocType || (req.user.role === "student" ? "Student College ID Card" : "Faculty Official ID")).trim();
+  const hostIdDocType = String(body.hostIdDocType || (req.user.role === "student" ? "Student ID Card" : "Faculty Official ID")).trim();
   const purpose = String(body.purpose || "Personal / Guest").trim();
   const arrivalDate = String(body.arrivalDate || "").trim();
   const exitDate = String(body.exitDate || "").trim();
