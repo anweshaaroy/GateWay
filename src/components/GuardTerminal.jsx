@@ -548,13 +548,17 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                     className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer transition text-slate-800"
                   >
                     <option value="Personal / Guest">Personal / Guest</option>
-                    <option value="Official Meeting">Official Meeting</option>
-                    <option value="Academic / Seminar">Academic / Seminar</option>
-                    <option value="Interview / Placement">Interview / Placement</option>
-                    <option value="Facility Maintenance">Contractor / Work</option>
+                    <option value="Parents / Family Visit">Parents / Family Visit</option>
+                    <option value="Academic Collaboration">Academic Collaboration / Research</option>
+                    <option value="Seminar / Conference / Workshop">Seminar / Conference / Workshop</option>
+                    <option value="Official Campus Meeting">Official Campus Meeting</option>
+                    <option value="Job Interview / Placement">Job Interview / Placement</option>
                     <option value="Courier / Delivery">Courier / Delivery</option>
-                    <option value="Vendor / Supplier">Vendor / Supply</option>
-                    <option value="Campus Tour / Visit">Campus Tour</option>
+                    <option value="Facility Maintenance">Facility Maintenance / Repair</option>
+                    <option value="Vendor / Supplier">Vendor / Supplier</option>
+                    <option value="Campus Tour / Admissions">Campus Tour / Admissions</option>
+                    <option value="Medical / Emergency Support">Medical / Emergency Support</option>
+                    <option value="Other / Miscellaneous">Other / Miscellaneous</option>
                   </select>
                 </div>
 
@@ -621,7 +625,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Govt. ID Document *
+                      Visitor ID Type *
                     </label>
                     <select
                       value={idType}
@@ -1081,8 +1085,8 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Currently Inside</p>
-            <p className="text-2xl font-black text-emerald-600 mt-1">{insideCount}</p>
+            <p className="text-xs font-bold text-slate-500">Currently Inside</p>
+            <p className="text-3xl font-black text-emerald-600 mt-1">{insideCount}</p>
           </div>
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100">
             <UserCheck className="w-5 h-5" />
@@ -1091,8 +1095,8 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs text-rose-500 font-bold uppercase tracking-wider">Overstay Alerts</p>
-            <p className="text-2xl font-black text-rose-600 mt-1">{overstayedCount}</p>
+            <p className="text-xs font-bold text-rose-500">Overstay Alerts</p>
+            <p className="text-3xl font-black text-rose-600 mt-1">{overstayedCount}</p>
           </div>
           <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100">
             <Clock className="w-5 h-5" />
@@ -1101,8 +1105,8 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs text-amber-500 font-bold uppercase tracking-wider">Expected Today</p>
-            <p className="text-2xl font-black text-amber-600 mt-1">{pendingCount}</p>
+            <p className="text-xs font-bold text-amber-600">Expected Today</p>
+            <p className="text-3xl font-black text-amber-600 mt-1">{pendingCount}</p>
           </div>
           <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100">
             <Hourglass className="w-5 h-5" />
@@ -1114,7 +1118,7 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
           className="bg-slate-900 hover:bg-slate-800 p-5 rounded-2xl text-white shadow-sm flex items-center justify-between cursor-pointer transition"
         >
           <div>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Security Audit</p>
+            <p className="text-xs font-bold text-slate-400">Security Audit</p>
             <p className="text-sm font-bold mt-1 tracking-wide">Export CSV Log</p>
           </div>
           <div className="p-3 bg-white/10 rounded-2xl">
@@ -1142,7 +1146,7 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
             className="px-4 py-2.5 text-sm font-bold rounded-xl bg-sky-600 hover:bg-sky-700 text-white flex items-center space-x-2 transition shadow-sm cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
-            <span>+ Issue Spot Pass</span>
+            <span>Issue Spot Pass</span>
           </button>
 
           <button
@@ -1150,7 +1154,7 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
             className="px-4 py-2.5 text-sm font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center space-x-2 transition shadow-sm cursor-pointer"
           >
             <Camera className="w-4 h-4" />
-            <span>Optical Scanner</span>
+            <span>Scan QR Pass</span>
           </button>
         </div>
       </div>
@@ -1159,16 +1163,16 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-100/90 text-slate-700 uppercase text-xs font-extrabold tracking-wider border-b border-slate-200">
+            <thead className="bg-slate-100/90 text-slate-800 text-sm font-bold border-b border-slate-200">
               <tr>
                 <th className="py-3.5 px-4 whitespace-nowrap">Passcode</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Visitor</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Host &amp; Details</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Host Details</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Purpose</th>
                 <th className="py-3.5 px-4 text-center whitespace-nowrap">Clearance</th>
                 <th className="py-3.5 px-4 text-center whitespace-nowrap">Gate Status</th>
-                <th className="py-3.5 px-4 text-center whitespace-nowrap">Check-IN</th>
-                <th className="py-3.5 px-4 text-center whitespace-nowrap">Check-OUT</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Check-In</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">Check-Out</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
@@ -1216,8 +1220,8 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
                         </div>
                         <div className="text-xs sm:text-sm text-slate-600 font-medium truncate max-w-[180px]">{item.email}</div>
                       </td>
-                      <td className="py-3.5 px-4 min-w-[180px]">
-                        <div className="font-bold text-slate-900 text-sm sm:text-base">
+                      <td className="py-3.5 px-4 min-w-[210px]">
+                        <div className="font-bold text-slate-900 text-sm sm:text-base whitespace-nowrap">
                           {item.hostName}
                         </div>
                         {item.hostAddress && (

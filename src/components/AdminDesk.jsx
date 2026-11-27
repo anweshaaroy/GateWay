@@ -48,7 +48,7 @@ export default function AdminDesk({
 }) {
   const [internalVisitors, setInternalVisitors] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [filter, setFilter] = useState("ALL");
+  const [filter, setFilter] = useState("All");
   const [activeDoc, setActiveDoc] = useState(null);
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -339,7 +339,7 @@ export default function AdminDesk({
     : [];
 
   const filteredDirectory =
-    filter === "ALL"
+    filter === "All" || filter === "ALL"
       ? visitors
       : filter === "Blacklisted"
       ? visitors.filter((v) => v?.blacklisted)
@@ -389,11 +389,8 @@ export default function AdminDesk({
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                Live Campus Security &amp; Gate Clearance Intelligence
+                Campus Security &amp; Gate Analytics
               </h3>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Real-time IIT Ropar gate activity, decision ratios, and campus presence
-              </p>
             </div>
           </div>
 
@@ -429,7 +426,7 @@ export default function AdminDesk({
             <div className="flex items-center justify-between mb-2">
               <span className="font-extrabold text-slate-900 text-sm flex items-center space-x-1.5">
                 <PieChartIcon className="w-4 h-4 text-sky-600" />
-                <span>Clearance Decision Ratio</span>
+                <span>Pass Clearance Analytics</span>
               </span>
               <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
                 {decisionPoolCount} Total
@@ -596,7 +593,7 @@ export default function AdminDesk({
             <div className="flex items-center justify-between">
               <span className="font-extrabold text-slate-900 text-sm flex items-center space-x-1.5">
                 <Users className="w-4 h-4 text-sky-600" />
-                <span>Live Campus Gate Flow</span>
+                <span>Live Gate Activity</span>
               </span>
               <span className="inline-flex items-center space-x-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -613,7 +610,7 @@ export default function AdminDesk({
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 font-medium">
-                Non-resident guests physically checked-in at IIT Ropar gates
+                Active visitors currently on campus
               </p>
             </div>
 
@@ -642,7 +639,7 @@ export default function AdminDesk({
             <div className="flex items-center justify-between">
               <span className="font-extrabold text-slate-900 text-sm flex items-center space-x-1.5">
                 <Building className="w-4 h-4 text-sky-600" />
-                <span>Premises &amp; Purpose Allocation</span>
+                <span>Purpose &amp; Location Breakdown</span>
               </span>
               <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
                 IIT Ropar
@@ -672,7 +669,6 @@ export default function AdminDesk({
                   }}
                 ></div>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium">Research, faculty meets vs personal visits</p>
             </div>
 
             {/* Premises Allocation Split */}
@@ -682,7 +678,7 @@ export default function AdminDesk({
                   <Building className="w-3.5 h-3.5" />
                   <span>Hostels ({hostelHostCount})</span>
                 </span>
-                <span className="text-emerald-700 font-bold">Faculty Qtrs ({facultyHostCount})</span>
+                <span className="text-emerald-700 font-bold">Faculty Residences ({facultyHostCount})</span>
               </div>
               <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
                 <div
@@ -698,7 +694,6 @@ export default function AdminDesk({
                   }}
                 ></div>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium">Satluj, Beas, Asikni vs Faculty Housing</p>
             </div>
           </div>
         </div>
@@ -712,7 +707,7 @@ export default function AdminDesk({
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-100/90 text-slate-700 uppercase text-xs font-extrabold tracking-wider border-b border-slate-200">
+            <thead className="bg-slate-100/90 text-slate-800 text-sm font-bold border-b border-slate-200">
               <tr>
                 <th className="py-3.5 px-3.5 whitespace-nowrap">Passcode</th>
                 <th className="py-3.5 px-3.5 whitespace-nowrap">Visitor Info &amp; Request Time</th>
@@ -847,11 +842,11 @@ export default function AdminDesk({
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <div className="flex items-center space-x-2.5">
             <Clock className="w-5 h-5 text-sky-600" />
-            <h3 className="font-black text-slate-900 text-lg">Campus Registered Visitors Master Directory</h3>
+            <h3 className="font-black text-slate-900 text-lg">Campus Visitor Directory</h3>
           </div>
 
           <div className="flex flex-wrap gap-1.5 bg-slate-100 p-1.5 rounded-xl text-xs sm:text-sm font-bold">
-            {["ALL", "Approved", "Pending Approval", "Rejected", "Blacklisted"].map((type) => (
+            {["All", "Approved", "Pending Approval", "Rejected", "Blacklisted"].map((type) => (
               <button
                 key={type}
                 onClick={() => setFilter(type)}
@@ -869,16 +864,16 @@ export default function AdminDesk({
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-100/80 text-slate-700 uppercase text-xs font-extrabold tracking-wider border-b border-slate-200">
+            <thead className="bg-slate-100/90 text-slate-800 text-sm font-bold border-b border-slate-200">
               <tr>
                 <th className="py-3.5 px-4">Passcode</th>
                 <th className="py-3.5 px-4">Visitor</th>
                 <th className="py-3.5 px-4">Host Details</th>
                 <th className="py-3.5 px-4">Host ID Type</th>
                 <th className="py-3.5 px-4">Stay Duration</th>
-                <th className="py-3.5 px-4">Security Clearance</th>
+                <th className="py-3.5 px-4">Clearance</th>
                 <th className="py-3.5 px-4">Gate Status</th>
-                <th className="py-3.5 px-4 text-right">Security Action</th>
+                <th className="py-3.5 px-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -911,7 +906,9 @@ export default function AdminDesk({
                     <td className="py-4 px-4 text-sm font-bold text-slate-800">{v.hostIdDocType}</td>
                     <td className="py-4 px-4 text-sm text-slate-700">
                       <div className="font-medium">{v.arrivalDate} to {v.exitDate}</div>
-                      <div className="text-xs text-sky-700 font-bold mt-0.5">{v.durationDays} Days</div>
+                      <div className="text-xs text-sky-700 font-bold mt-0.5">
+                        {v.durationDays} {Number(v.durationDays) === 1 ? "Day" : "Days"}
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <span

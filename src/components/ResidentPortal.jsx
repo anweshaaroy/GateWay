@@ -15,17 +15,13 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
   // Normalize role check (case-insensitive)
   const isStudent = activeUser?.role?.toLowerCase() === "student";
 
-  const [hostName, setHostName] = useState(
-    isStudent
-      ? `Student ${activeUser?.entryNumber || activeUser?.email?.split("@")[0] || "Resident"}`
-      : `Prof. ${activeUser?.email?.split("@")[0] || "Faculty"}`
-  );
+  const [hostName, setHostName] = useState("");
   const [selectedHostel, setSelectedHostel] = useState(
     isStudent ? "Satluj (Boys Hostel)" : "Faculty Residential Enclave"
   );
   const [roomNumber, setRoomNumber] = useState("");
   const [hostIdDocType, setHostIdDocType] = useState(
-    isStudent ? "Student College ID Card" : "Faculty Official ID"
+    isStudent ? "Student ID Card" : "Faculty Official ID"
   );
   const [hostFile, setHostFile] = useState(null);
 
@@ -128,6 +124,8 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
         setVisitorName("");
         setVisitorEmail("");
         setIdNumber("");
+        setHostName("");
+        setRoomNumber("");
         setAccompanyingCount(0);
         setVisitorFile(null);
         setHostFile(null);
@@ -198,7 +196,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
                   Visitor Full Name *
                 </label>
                 <input
@@ -211,7 +209,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                 />
               </div>
               <div>
-                <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
                   Visitor Email Address *
                 </label>
                 <input
@@ -228,8 +226,8 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/90 space-y-3.5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
-                    Govt. ID Document *
+                  <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                    Visitor ID Type *
                   </label>
                   <select
                     value={idType}
@@ -241,7 +239,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                  <label className="block text-sm font-bold text-slate-800 mb-1.5">
                     {idType === "Aadhaar Card" ? "Aadhaar Number *" : "Passport Number *"}
                   </label>
                   <input
@@ -257,9 +255,8 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
               </div>
 
               <div>
-                <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5 flex items-center justify-between">
-                  <span>Upload Visitor ID Proof (JPG / PDF only) *</span>
-                  <span className="text-xs sm:text-[13px] text-slate-500 font-semibold">Formats: .jpg, .jpeg, .pdf</span>
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                  Upload Visitor ID Proof *
                 </label>
                 <input
                   type="file"
@@ -304,20 +301,21 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
                   Host Name *
                 </label>
                 <input
                   type="text"
                   required
+                  placeholder="Enter host full name"
                   value={hostName}
                   onChange={(e) => setHostName(e.target.value)}
-                  className="w-full text-sm sm:text-base font-medium px-4 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none bg-white text-slate-900 shadow-2xs"
+                  className="w-full text-sm sm:text-base font-medium px-4 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none bg-white text-slate-900 placeholder-slate-400 shadow-2xs"
                 />
               </div>
               <div>
-                <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
-                  Host Hostel / Campus Address *
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                  Host Residence / Campus Address *
                 </label>
                 <div className="space-y-2">
                   <select
@@ -350,24 +348,23 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
 
             <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/90 space-y-3.5 shadow-2xs">
               <div>
-                <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
-                  Host ID Document *
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                  Host ID Type *
                 </label>
                 <select
                   value={hostIdDocType}
                   onChange={(e) => setHostIdDocType(e.target.value)}
                   className="w-full text-sm sm:text-base font-semibold px-4 py-3 sm:py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 shadow-2xs"
                 >
-                  <option value="Student College ID Card">Student College ID Card</option>
+                  <option value="Student ID Card">Student ID Card</option>
                   <option value="Faculty Official ID">Faculty Official ID</option>
                   <option value="Staff / Official Employee Card">Staff / Official Employee Card</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5 flex items-center justify-between">
-                  <span>Upload Host ID Proof (JPG / PDF only) *</span>
-                  <span className="text-xs sm:text-[13px] text-slate-500 font-semibold">Formats: .jpg, .jpeg, .pdf</span>
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                  Upload Host ID Proof *
                 </label>
                 <input
                   type="file"
@@ -379,14 +376,14 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
             </div>
           </div>
 
-          {/* Section 3: Visit Window & Purpose */}
+          {/* Section 3: Visit Schedule & Purpose */}
           <div className="space-y-3.5 pt-4 border-t border-slate-100">
             <h3 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
-              3. Visit Window & Purpose
+              3. Visit Schedule & Purpose
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/50 p-4 rounded-2xl border border-sky-100 shadow-2xs">
               <div>
-                <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
                   Arrival Date *
                 </label>
                 <input
@@ -398,7 +395,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                 />
               </div>
               <div>
-                <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
+                <label className="block text-sm font-bold text-slate-800 mb-1.5">
                   Expected Departure Date *
                 </label>
                 <input
@@ -412,8 +409,8 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
             </div>
 
             <div>
-              <label className="block text-[13px] sm:text-sm font-bold text-slate-800 uppercase tracking-wide mb-1.5">
-                Purpose of Visit
+              <label className="block text-sm font-bold text-slate-800 mb-1.5">
+                Purpose of Visit *
               </label>
               <select
                 value={purpose}
@@ -421,9 +418,17 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                 className="w-full text-sm sm:text-base font-semibold px-4 py-3 sm:py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 bg-white shadow-2xs cursor-pointer"
               >
                 <option value="Personal / Guest">Personal / Guest</option>
-                <option value="Academic Collaboration">Academic Collaboration</option>
+                <option value="Parents / Family Visit">Parents / Family Visit</option>
+                <option value="Academic Collaboration">Academic Collaboration / Research</option>
+                <option value="Seminar / Conference / Workshop">Seminar / Conference / Workshop</option>
+                <option value="Official Campus Meeting">Official Campus Meeting</option>
+                <option value="Job Interview / Placement">Job Interview / Placement</option>
                 <option value="Courier / Delivery">Courier / Delivery</option>
-                <option value="Facility Maintenance">Facility Maintenance</option>
+                <option value="Facility Maintenance">Facility Maintenance / Repair</option>
+                <option value="Vendor / Supplier">Vendor / Supplier</option>
+                <option value="Campus Tour / Admissions">Campus Tour / Admissions</option>
+                <option value="Medical / Emergency Support">Medical / Emergency Support</option>
+                <option value="Other / Miscellaneous">Other / Miscellaneous</option>
               </select>
             </div>
           </div>
