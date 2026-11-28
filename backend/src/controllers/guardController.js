@@ -84,9 +84,13 @@ export const createSpotPass = asyncHandler(async (req, res) => {
     visitHistory.push({ action: "CHECK_IN", actor: req.user._id, notes: "Auto check-in recorded on pass issuance." });
   }
 
+  const visitorFile = req.files?.visitorFile?.[0] || req.files?.idDocFile?.[0] || req.file;
+  const idDocName = visitorFile ? visitorFile.originalname : String(body.idDocName || "").slice(0, 160);
+  const idDocUrl = visitorFile ? `/documents/${encodeURIComponent(visitorFile.filename)}` : null;
+
   const visitor = await Visitor.create({
     id: await createUniqueVisitorId(), passcode: await createUniquePasscode(), qrToken: createQrToken(), requester: req.user._id,
-    name, email, phone: phone || "—", idType, idNumber: "[Walk-in ID verified by guard]", idDocName: String(body.idDocName || "").slice(0, 160), idDocUrl: null,
+    name, email, phone: phone || "—", idType, idNumber: "[Walk-in ID verified by guard]", idDocName, idDocUrl,
     accompanyingCount, totalVisitors,
     hostName, hostEmail: req.user.email, hostAddress: "Campus Main Facility", hostIdDocType: "Instant Guard Permit", hostDocName: "", hostDocUrl: null,
     purpose, arrivalDate, exitDate, durationDays, approvalStatus: "Approved", status: initialStatus, checkInTime: initialCheckInTime, requestTimestamp: timeLabel(), blacklisted: false,
