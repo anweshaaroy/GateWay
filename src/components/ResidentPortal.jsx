@@ -271,10 +271,10 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
             <div className="bg-sky-50/70 p-4 rounded-2xl border border-sky-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
               <div>
                 <label className="block text-base font-black text-slate-900">
-                  Accompanying Family / Group Members
+                  Additional Visitors
                 </label>
                 <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-                  Visiting with family? Enter how many additional persons are accompanying (excluding lead visitor).
+                  Number of additional guests accompanying the primary visitor.
                 </p>
               </div>
               <div className="flex items-center space-x-2 shrink-0">
@@ -288,7 +288,7 @@ export default function ResidentPortal({ activeUser, onPassCreated, activePass, 
                   className="w-20 text-center text-sm sm:text-base font-black px-3 py-2.5 sm:py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none text-slate-900 shadow-2xs"
                 />
                 <span className="text-xs sm:text-sm font-bold px-3.5 py-2 rounded-xl bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
-                  Total: {1 + Number(accompanyingCount)} {1 + Number(accompanyingCount) === 1 ? "Person" : "Persons"}
+                  Total: {1 + Number(accompanyingCount)} {1 + Number(accompanyingCount) === 1 ? "Guest" : "Guests"}
                 </span>
               </div>
             </div>

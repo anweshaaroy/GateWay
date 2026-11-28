@@ -274,6 +274,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   const [validityPreset, setValidityPreset] = useState(1);
   const [idType, setIdType] = useState("Aadhaar Card");
   const [idDocName, setIdDocName] = useState("");
+  const [visitorProofFile, setVisitorProofFile] = useState(null);
   const [accompanyingCount, setAccompanyingCount] = useState(0);
   const [autoCheckIn, setAutoCheckIn] = useState(true);
   const [generatedPass, setGeneratedPass] = useState(null);
@@ -293,6 +294,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
       setValidityPreset(1);
       setGeneratedPass(null);
       setIdDocName("");
+      setVisitorProofFile(null);
       setAccompanyingCount(0);
       setAutoCheckIn(true);
       setEmailNotice("");
@@ -319,6 +321,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      setVisitorProofFile(file);
       setIdDocName(file.name);
     }
   };
@@ -337,19 +340,21 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
     setIsSubmitting(true);
     setEmailNotice("");
 
-    const payload = {
-      visitorName: visitorName.trim(),
-      visitorEmail: visitorEmail.trim().toLowerCase(),
-      hostName: hostName.trim(),
-      purpose,
-      fromDate,
-      toDate,
-      calculatedDays,
-      accompanyingCount,
-      autoCheckIn,
-      idType,
-      idDocName: idDocName || "walk_in_id_scan.jpg",
-    };
+    const formData = new FormData();
+    formData.append("visitorName", visitorName.trim());
+    formData.append("visitorEmail", visitorEmail.trim().toLowerCase());
+    formData.append("hostName", hostName.trim());
+    formData.append("purpose", purpose);
+    formData.append("fromDate", fromDate);
+    formData.append("toDate", toDate);
+    formData.append("calculatedDays", calculatedDays);
+    formData.append("accompanyingCount", accompanyingCount);
+    formData.append("autoCheckIn", autoCheckIn);
+    formData.append("idType", idType);
+    formData.append("idDocName", idDocName || "walk_in_id_scan.jpg");
+    if (visitorProofFile) {
+      formData.append("visitorFile", visitorProofFile);
+    }
 
     try {
       const token =
@@ -360,10 +365,9 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
       const res = await fetch(`${BACKEND_URL}/guard/spot-pass`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
+        body: formData,
       });
       const data = await res.json();
 
@@ -439,14 +443,14 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-4xl w-full overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-5xl w-full overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shrink-0">
           <div className="flex items-center space-x-3.5 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center font-bold text-lg shadow-2xs shrink-0">
-              <UserPlus className="w-5 h-5 text-sky-600" />
+            <div className="w-10 h-10 rounded-xl bg-sky-600 text-white shadow-md shadow-sky-500/20 flex items-center justify-center font-bold text-lg shrink-0">
+              <UserPlus className="w-5 h-5 text-white" />
             </div>
-            <h3 className="font-bold text-base sm:text-lg text-slate-800 tracking-tight leading-normal whitespace-nowrap truncate">
+            <h3 className="font-black text-lg sm:text-xl text-slate-900 tracking-tight leading-normal whitespace-nowrap truncate">
               Instant Walk-In Spot Pass
             </h3>
           </div>
@@ -462,12 +466,12 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
         {/* Modal Body */}
         <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 overflow-y-auto bg-slate-50/50">
           {/* Left Column: Input Form (7 cols) */}
-          <div className="md:col-span-7 space-y-3.5">
-            <form onSubmit={handleCreatePass} className="space-y-3.5">
+          <div className="md:col-span-7 space-y-4">
+            <form onSubmit={handleCreatePass} className="space-y-4">
               {/* Name & Email (Phone Number Removed) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
                     Visitor Full Name *
                   </label>
                   <input
@@ -476,11 +480,11 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                     value={visitorName}
                     onChange={(e) => setVisitorName(e.target.value)}
                     placeholder="e.g. Rahul Sharma"
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition bg-white text-slate-800 placeholder-slate-400"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400 placeholder:font-normal shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
                     Visitor Email Address *
                   </label>
                   <input
@@ -489,40 +493,40 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                     value={visitorEmail}
                     onChange={(e) => setVisitorEmail(e.target.value)}
                     placeholder="e.g. rahul.sharma@example.com"
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition bg-white text-slate-800 placeholder-slate-400"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400 placeholder:font-normal shadow-2xs"
                   />
                 </div>
               </div>
 
               {/* Accompanying Members / Group Size */}
-              <div className="bg-sky-50/70 p-3.5 rounded-xl border border-sky-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="bg-sky-50/70 p-4 rounded-2xl border border-sky-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
                 <div>
-                  <label className="block text-xs font-bold text-slate-800">
-                    Accompanying Family / Group Members
+                  <label className="block text-xs sm:text-sm font-bold text-slate-900">
+                    Additional Visitors
                   </label>
-                  <p className="text-[11px] text-slate-500">
-                    Visiting with family? Enter how many additional persons are accompanying (excluding lead visitor).
+                  <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">
+                    Number of additional guests accompanying the primary visitor.
                   </p>
                 </div>
                 <div className="flex items-center space-x-2 shrink-0">
-                  <span className="text-xs text-slate-500 font-semibold">+</span>
+                  <span className="text-sm font-bold text-slate-500">+</span>
                   <input
                     type="number"
                     min="0"
                     max="30"
                     value={accompanyingCount}
                     onChange={(e) => setAccompanyingCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                    className="w-20 text-center text-sm font-bold px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none"
+                    className="w-20 text-center text-sm sm:text-base font-black px-3 py-2 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-600 outline-none text-slate-900 shadow-2xs"
                   />
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-sky-100 text-sky-800 border border-sky-200">
-                    Total: {1 + Number(accompanyingCount)} {1 + Number(accompanyingCount) === 1 ? "Person" : "Persons"}
+                  <span className="text-xs sm:text-sm font-bold px-3 py-2 rounded-xl bg-sky-100 text-sky-900 border border-sky-300 shadow-2xs">
+                    Total: {1 + Number(accompanyingCount)} {1 + Number(accompanyingCount) === 1 ? "Guest" : "Guests"}
                   </span>
                 </div>
               </div>
 
               {/* Host Name or Department */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
                   Host Name *
                 </label>
                 <input
@@ -531,21 +535,21 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                   value={hostName}
                   onChange={(e) => setHostName(e.target.value)}
                   placeholder="e.g. Prof. 2026csm1020 / Admin Block / Hostel"
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none transition bg-white text-slate-800 placeholder-slate-400"
+                  className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-600 outline-none transition bg-white text-slate-900 placeholder:text-slate-400 placeholder:font-normal shadow-2xs"
                 />
               </div>
 
               {/* Purpose & Pass Validity as Select Dropdowns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {/* Purpose of Visit Select Dropdown */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
                     Purpose of Visit *
                   </label>
                   <select
                     value={purpose}
                     onChange={(e) => setPurpose(e.target.value)}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer transition text-slate-800"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-600 outline-none cursor-pointer transition text-slate-900 shadow-2xs"
                   >
                     <option value="Personal / Guest">Personal / Guest</option>
                     <option value="Parents / Family Visit">Parents / Family Visit</option>
@@ -564,7 +568,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
 
                 {/* Pass Validity Select Dropdown */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
                     Pass Validity *
                   </label>
                   <select
@@ -573,7 +577,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                       const val = e.target.value;
                       applyValidityPreset(val === "custom" ? "custom" : Number(val));
                     }}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer transition text-slate-800"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-600 outline-none cursor-pointer transition text-slate-900 shadow-2xs"
                   >
                     <option value={1}>1 Day (Today Only)</option>
                     <option value={3}>3 Days</option>
@@ -587,9 +591,9 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
               </div>
 
               {/* Date Inputs */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
                     Valid From
                   </label>
                   <input
@@ -600,11 +604,11 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                       setFromDate(e.target.value);
                       setValidityPreset("custom");
                     }}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none bg-white text-slate-800"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-600 outline-none bg-white text-slate-900 shadow-2xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
                     Valid Until
                   </label>
                   <input
@@ -615,22 +619,22 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                       setToDate(e.target.value);
                       setValidityPreset("custom");
                     }}
-                    className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 outline-none bg-white text-slate-800"
+                    className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-600 outline-none bg-white text-slate-900 shadow-2xs"
                   />
                 </div>
               </div>
 
               {/* ID Verification Proof (No Live Photo, Standard ID) */}
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-slate-50/80 p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
                       Visitor ID Type *
                     </label>
                     <select
                       value={idType}
                       onChange={(e) => setIdType(e.target.value)}
-                      className="w-full text-sm px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-sky-500 outline-none cursor-pointer text-slate-800"
+                      className="w-full text-sm font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-sky-600 outline-none cursor-pointer text-slate-900 shadow-2xs"
                     >
                       <option value="Aadhaar Card">Aadhaar Card</option>
                       <option value="Driving License">Driving License</option>
@@ -640,22 +644,21 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                      <span>Upload Visitor ID Proof *</span>
-                      <span className="text-[10px] text-slate-400 font-normal">Formats: .jpg, .jpeg, .pdf</span>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1.5">
+                      Upload Visitor ID Proof *
                     </label>
                     <input
                       type="file"
                       accept="image/*,.pdf"
                       onChange={handleFileUpload}
-                      className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer"
+                      className="w-full text-xs text-slate-600 rounded-xl border border-slate-300 bg-white px-3 py-1.5 shadow-2xs file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 cursor-pointer"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Auto Check-In Toggle */}
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
+              <div className="py-2.5 px-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl flex items-center justify-between shadow-2xs">
                 <div className="flex items-center space-x-2.5">
                   <input
                     type="checkbox"
@@ -664,11 +667,11 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                     onChange={(e) => setAutoCheckIn(e.target.checked)}
                     className="w-4 h-4 text-emerald-600 rounded cursor-pointer accent-emerald-600"
                   />
-                  <label htmlFor="autoCheckinCheckbox" className="text-xs font-semibold text-emerald-950 cursor-pointer">
-                    Auto Check-IN Immediately <span className="text-emerald-700 font-normal">(Instant "Inside Campus" entry)</span>
+                  <label htmlFor="autoCheckinCheckbox" className="text-xs sm:text-[13px] font-bold text-emerald-950 cursor-pointer">
+                    Auto Check-In on Issue
                   </label>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-300">
+                <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300 shadow-2xs">
                   RECOMMENDED
                 </span>
               </div>
@@ -677,7 +680,7 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-sky-400 text-white font-bold py-2.5 px-4 rounded-lg text-sm transition shadow-sm flex items-center justify-center space-x-2 cursor-pointer mt-2"
+                className="w-full bg-sky-600 hover:bg-sky-500 disabled:bg-sky-400 text-white font-black py-3 px-4 rounded-xl text-sm transition shadow-md shadow-sky-600/25 flex items-center justify-center space-x-2 cursor-pointer mt-2"
               >
                 {isSubmitting ? (
                   <>
@@ -703,19 +706,16 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                   CAMPUS VISITOR PASS
                 </span>
                 <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                    activePass.status === "Inside Campus"
-                      ? "bg-emerald-950/70 text-emerald-400 border-emerald-800"
-                      : "bg-emerald-950/70 text-emerald-400 border-emerald-800"
-                  }`}
+                  className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border bg-emerald-950/70 text-emerald-400 border-emerald-800 flex items-center space-x-1.5"
                 >
-                  {activePass.status === "Inside Campus" ? "INSIDE CAMPUS" : "APPROVED"}
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>{activePass.status === "Inside Campus" ? "INSIDE CAMPUS" : "APPROVED"}</span>
                 </span>
               </div>
 
               {/* Center Scannable QR Code on White Box */}
               <div className="flex flex-col items-center justify-center pt-1">
-                <div className="w-36 h-36 bg-white p-3 rounded-2xl flex items-center justify-center shadow-md border border-slate-200/40">
+                <div className="w-36 h-36 bg-white p-3 rounded-2xl flex items-center justify-center shadow-lg border border-slate-200/40">
                   {generatedPass ? (
                     <QRCodeSVG value={generatedPass.passcode} size={120} level="H" />
                   ) : (
@@ -737,52 +737,51 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                 {/* PASSCODE with neon green accent */}
                 <div className="text-center mt-3">
                   <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
-                    PASSCODE:{" "}
+                    ENTRY PASSCODE:{" "}
                   </span>
-                  <span className="text-emerald-400 font-mono font-black text-lg tracking-wider">
+                  <span className="text-emerald-400 font-mono font-black text-xl tracking-wider ml-1">
                     {generatedPass ? generatedPass.passcode : "8683"}
                   </span>
                 </div>
               </div>
 
               {/* Visitor Details Box */}
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-3.5 space-y-2 text-xs">
+              <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl p-4 space-y-2.5 text-xs">
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Visitor:</span>
+                  <span className="text-slate-400 font-medium">Visitor:</span>
                   <span className="font-bold text-white truncate max-w-[170px]">
                     {activePass.name}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Email:</span>
+                  <span className="text-slate-400 font-medium">Email:</span>
                   <span className="text-slate-200 font-medium truncate max-w-[170px]">
                     {activePass.email}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Visitor ID:</span>
+                  <span className="text-slate-400 font-medium">Visitor ID:</span>
                   <span className="text-emerald-400 font-semibold truncate max-w-[170px]">
                     {idType}: [ID Verified]
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Total Headcount:</span>
+                  <span className="text-slate-400 font-medium">Total Headcount:</span>
                   <span className="font-bold text-emerald-400">
-                    {1 + accompanyingCount} {1 + accompanyingCount > 1 ? "Persons" : "Person"}{" "}
-                    {accompanyingCount > 0 ? `(1 + ${accompanyingCount})` : "(Solo)"}
+                    {1 + accompanyingCount} {1 + accompanyingCount === 1 ? "Guest (Solo)" : `Guests (1 + ${accompanyingCount})`}
                   </span>
                 </div>
 
                 <div className="border-t border-slate-700/50 my-1"></div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Host Name:</span>
+                  <span className="text-slate-400 font-medium">Host Name:</span>
                   <span className="font-bold text-white truncate max-w-[170px]">
                     {activePass.hostName}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Purpose:</span>
+                  <span className="text-slate-400 font-medium">Purpose:</span>
                   <span className="text-slate-200 font-medium truncate max-w-[170px]">
                     {activePass.purpose}
                   </span>
@@ -791,13 +790,13 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                 <div className="border-t border-slate-700/50 my-1"></div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Stay Window:</span>
+                  <span className="text-slate-400 font-medium">Stay Window:</span>
                   <span className="text-amber-400 font-bold font-mono text-[11px]">
                     {fromDate} to {toDate}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Duration:</span>
+                  <span className="text-slate-400 font-medium">Duration:</span>
                   <span className="text-white font-bold">
                     {calculatedDays} {calculatedDays > 1 ? "Days" : "Day"}
                   </span>
@@ -819,13 +818,17 @@ function SpotRegistrationModal({ isOpen, onClose, onRegisterSuccess }) {
                 onClick={() => {
                   if (generatedPass) {
                     alert(`e-Pass with QR credentials sent to ${generatedPass.email}`);
-                  } else {
-                    alert("Fill the details and click 'Issue Instant Spot Pass' to dispatch the e-Pass email.");
                   }
                 }}
-                className="w-full py-2.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold transition flex items-center justify-center space-x-2 shadow-md cursor-pointer"
+                disabled={!generatedPass}
+                className={`w-full py-3 px-4 rounded-xl text-sm font-bold transition flex items-center justify-center space-x-2 ${
+                  generatedPass
+                    ? "bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-600/20 cursor-pointer"
+                    : "bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed opacity-60"
+                }`}
+                title={generatedPass ? "Send pass by email" : "Issue spot pass first to send e-Pass"}
               >
-                <Mail className="w-3.5 h-3.5 text-white" />
+                <Mail className="w-4 h-4" />
                 <span>Send e-Pass</span>
               </button>
             </div>
@@ -1196,7 +1199,7 @@ export default function GuardTerminal({ visitors = [], onStatusChange, onAddVisi
                       } ${item.blacklisted ? "bg-red-50/80" : ""}`}
                     >
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="font-mono font-black text-base text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 inline-block">
+                        <span className="font-mono font-black text-base text-sky-900 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200/90 shadow-2xs inline-block">
                           {item.passcode}
                         </span>
                         {item.blacklisted && (

@@ -730,8 +730,10 @@ export default function AdminDesk({
                       v.blacklisted ? "bg-rose-50/70" : ""
                     }`}
                   >
-                    <td className="py-3.5 px-3.5 font-mono font-black text-base text-slate-900 whitespace-nowrap">
-                      {v.passcode}
+                    <td className="py-3.5 px-3.5 whitespace-nowrap">
+                      <span className="font-mono font-black text-base text-sky-900 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200/90 shadow-2xs inline-block">
+                        {v.passcode}
+                      </span>
                       {v.blacklisted && (
                         <span className="block text-[10px] text-rose-600 font-sans font-extrabold mt-0.5">
                           FLAGGED
@@ -887,8 +889,10 @@ export default function AdminDesk({
                       v.blacklisted ? "bg-rose-50/60" : ""
                     }`}
                   >
-                    <td className="py-4 px-4 font-mono font-black text-base text-sky-800">
-                      {v.passcode}
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <span className="font-mono font-black text-base text-sky-900 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-200/90 shadow-2xs inline-block">
+                        {v.passcode}
+                      </span>
                       {v.blacklisted && (
                         <span className="block text-xs text-rose-600 font-sans font-extrabold mt-0.5">
                           FLAGGED

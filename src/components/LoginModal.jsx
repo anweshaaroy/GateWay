@@ -92,7 +92,7 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
   const residentOptions = [
     { id: "student", label: "Student", icon: GraduationCap },
     { id: "faculty", label: "Faculty", icon: Briefcase },
-    { id: "official", label: "Official", icon: Building2 },
+    { id: "official", label: "Staff", icon: Building2 },
   ];
 
   return (
@@ -115,8 +115,8 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">GateWay Portal</h2>
-            <p className="text-xs text-slate-500 font-medium">IIT Ropar Institutional Access</p>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">GateWay Portal</h2>
+            <p className="text-xs sm:text-[13px] text-slate-500 font-medium">IIT Ropar Institutional Access</p>
           </div>
         </div>
 
@@ -131,7 +131,7 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
         <div className="space-y-5">
           {/* Main Role Dropdown */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+            <label className="block text-[14px] font-bold text-slate-900 mb-2">
               Select Login Portal *
             </label>
             <div className="relative">
@@ -144,20 +144,20 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
                     setEntryNumber("");
                   }
                 }}
-                className="w-full text-sm font-semibold px-4 py-3 rounded-xl border border-slate-300 bg-slate-50/50 hover:bg-white text-slate-800 focus:bg-white focus:ring-2 focus:ring-sky-600 appearance-none shadow-sm cursor-pointer outline-none transition"
+                className="w-full text-[15px] font-bold px-4 py-3.5 rounded-xl border border-slate-300 bg-slate-50/60 hover:bg-white text-slate-900 focus:bg-white focus:ring-2 focus:ring-sky-600 appearance-none shadow-sm cursor-pointer outline-none transition"
               >
-                <option value="resident">Resident: Student / Faculty / Official</option>
+                <option value="resident">Resident Portal</option>
                 <option value="admin">Security Admin Desk</option>
-                <option value="guard">Guard Terminal Post</option>
+                <option value="guard">Security Guard Terminal</option>
               </select>
-              <ChevronDown className="pointer-events-none absolute right-3.5 top-3.5 w-4 h-4 text-slate-500" />
+              <ChevronDown className="pointer-events-none absolute right-4 top-4 w-4.5 h-4.5 text-slate-500" />
             </div>
           </div>
 
           {/* Sub-Category for Residents */}
           {roleSelect === "resident" && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+              <label className="block text-[14px] font-bold text-slate-900 mb-2">
                 Resident Category *
               </label>
               <div className="grid grid-cols-3 gap-2.5">
@@ -171,13 +171,13 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
                         setResidentType(id);
                         setErrorMsg("");
                       }}
-                      className={`flex items-center justify-center space-x-2 py-2.5 px-3 rounded-xl border text-xs font-bold transition-all duration-150 cursor-pointer ${
+                      className={`flex items-center justify-center space-x-2 py-3 px-3 rounded-xl border text-[15px] transition-all duration-150 cursor-pointer ${
                         isSelected
-                          ? "border-sky-600 bg-sky-50 text-sky-700 shadow-sm ring-1 ring-sky-600"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                          ? "border-sky-600 bg-sky-50 text-sky-700 shadow-sm ring-2 ring-sky-600/30 font-bold"
+                          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 font-semibold"
                       }`}
                     >
-                      <Icon className="w-3.5 h-3.5" />
+                      <Icon className="w-4.5 h-4.5 shrink-0" />
                       <span>{label}</span>
                     </button>
                   );
@@ -189,23 +189,20 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
           {/* Roll Number Input (Students Only) */}
           {roleSelect === "resident" && residentType === "student" && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Student Entry / Roll Number *
+              <label className="block text-[14px] font-bold text-slate-900 mb-2">
+                Student Roll / Entry No. *
               </label>
               <div className="relative">
-                <IdCard className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                <IdCard className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
                 <input
                   type="text"
                   required
                   value={entryNumber}
                   onChange={(e) => setEntryNumber(e.target.value)}
                   placeholder="e.g. 2024CSB1001"
-                  className="w-full text-sm pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-600 font-mono uppercase tracking-wider outline-none text-slate-800"
+                  className="w-full text-base pl-11 pr-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-sky-600 font-mono uppercase font-bold text-slate-900 tracking-wider placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 placeholder:font-normal outline-none bg-slate-50/50 focus:bg-white transition"
                 />
               </div>
-              <p className="text-[11px] text-slate-400 mt-1.5">
-                Enter your roll number before signing in with Google.
-              </p>
             </div>
           )}
 
@@ -217,22 +214,24 @@ export default function LoginModal({ isOpen, onLogin, onClose }) {
                   Verifying with Security Server...
                 </div>
               ) : (
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => setErrorMsg("Google Sign-In failed or was cancelled.")}
-                  shape="pill"
-                  text="signin_with"
-                  theme="outline"
-                  size="large"
-                  width="100%"
-                />
+                <div className="rounded-full shadow-md shadow-sky-600/20 hover:shadow-lg hover:shadow-sky-600/30 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => setErrorMsg("Google Sign-In failed or was cancelled.")}
+                    shape="pill"
+                    text="signin_with"
+                    theme="filled_blue"
+                    size="large"
+                    width="240"
+                  />
+                </div>
               )}
             </div>
 
-            <div className="flex items-center space-x-1.5 text-[11px] text-slate-500 mt-3 font-medium">
-              <Lock className="w-3 h-3 text-slate-400" />
+            <div className="flex items-center space-x-1.5 text-xs text-slate-500 mt-3 font-medium">
+              <Lock className="w-3.5 h-3.5 text-slate-400" />
               <span>
-                Requires active <strong className="text-slate-700">@iitrpr.ac.in</strong> account
+                Requires active <strong className="text-slate-700 font-semibold">@iitrpr.ac.in</strong> account
               </span>
             </div>
           </div>
